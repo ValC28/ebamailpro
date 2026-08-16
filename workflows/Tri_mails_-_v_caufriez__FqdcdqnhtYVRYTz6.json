@@ -1,0 +1,296 @@
+{
+  "name": "Tri mails - v.caufriez",
+  "nodes": [
+    {
+      "parameters": {
+        "format": "resolved",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "4acf197b-93b5-4ffa-894d-e8cf9068550e",
+      "name": "Email Trigger (IMAP)",
+      "credentials": {
+        "imap": {
+          "id": "wVKdbE1JQnIB1kzf",
+          "name": "IMAP - v.caufriez@ebanista.fr"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Voici un email à analyser :\nExpéditeur : {{ $json.from.text }}\nSujet : {{ $json.subject }}\nContenu : {{ $json.text }}\n",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "Tu es un assistant qui trie les emails professionnels d'une entreprise de menuiserie/ébénisterie (EBANISTA). Pour chaque email, réponds UNIQUEMENT en JSON avec cette structure exacte : {   \"categorie\": \"fournisseurs\" | \"prospects\" | \"suivi_client\" | \"administratif\" | \"litige\" | \"facturation\" | \"spam\",   \"urgent\": true ou false,   \"resume\": \"résumé en 2-3 lignes maximum\",   \"auto_envoi_possible\": true ou false }  Règles : - \"litige\" = urgent toujours true, auto_envoi_possible toujours false - \"auto_envoi_possible\" = true UNIQUEMENT pour un accusé de réception simple, une confirmation de rdv déjà validée, ou un accusé fournisseur — jamais pour un devis, une facture, ou un sujet juridique - \"spam\" = newsletters, publicités"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        608,
+        0
+      ],
+      "id": "0c6fe25a-11e3-4c7e-b5ae-efd8a3629137",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-6",
+          "cachedResultName": "Claude Sonnet 4.6"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        992,
+        0
+      ],
+      "id": "9d47d40d-f929-4681-ab5c-711d775c9e1d",
+      "name": "Anthropic Chat Model",
+      "credentials": {
+        "anthropicApi": {
+          "id": "FRxZizEr7zCaHHZp",
+          "name": "Claude API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\n\nfor (const item of $input.all()) {\n  const rawText = item.json.text;\n  const match = rawText.match(/\\{[\\s\\S]*\\}/);\n  const parsed = JSON.parse(match[0]);\n  \n  results.push({\n    json: {\n      categorie: parsed.categorie,\n      urgent: parsed.urgent,\n      resume: parsed.resume,\n      auto_envoi_possible: parsed.auto_envoi_possible\n    }\n  });\n}\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        144
+      ],
+      "id": "10349273-435b-4320-b5fb-fbebf52de6a6",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f22f7138-265f-46e1-8325-3ff0776b55a7",
+              "leftValue": "={{ $json.urgent }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1344,
+        144
+      ],
+      "id": "0b6b1958-7db2-468c-bf33-935de9103024",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "chatId": "8848139246",
+        "text": "=🚨 Mail urgent reçu\n\nDe : {{ $('Email Trigger (IMAP)').item.json.from.text }}\nCatégorie : {{ $json.categorie }}\n\n{{ $json.resume }}\n",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1568,
+        48
+      ],
+      "id": "a00d2675-2c89-4e0f-b077-76de969ad947",
+      "name": "Send a text message",
+      "webhookId": "98c72095-6cdf-4118-b2eb-fece056cf3aa",
+      "credentials": {
+        "telegramApi": {
+          "id": "duvmoy6UkxnbnBdr",
+          "name": "Ebanista Mails"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "IgT0r6Yg3ZtzMWNR",
+          "mode": "list",
+          "cachedResultName": "digest_mails",
+          "cachedResultUrl": "/projects/WBZOJkoq8ImSC8dI/datatables/IgT0r6Yg3ZtzMWNR"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "auto_envoye": "={{ $json.auto_envoi_possible }}",
+            "expediteur": "={{ $('Email Trigger (IMAP)').item.json.from.text }}",
+            "categorie": "={{ $json.categorie }}",
+            "resume": "={{ $json.resume }}",
+            "date": "={{ $now.format('yyyy-MM-dd HH:mm') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "expediteur",
+              "displayName": "expediteur",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "categorie",
+              "displayName": "categorie",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "resume",
+              "displayName": "resume",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "auto_envoye",
+              "displayName": "auto_envoye",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1568,
+        240
+      ],
+      "id": "122b45a3-88b0-46be-be02-8b79a661cf3f",
+      "name": "Insert row"
+    }
+  ],
+  "connections": {
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Trigger (IMAP)": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Insert row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "active": true
+}
