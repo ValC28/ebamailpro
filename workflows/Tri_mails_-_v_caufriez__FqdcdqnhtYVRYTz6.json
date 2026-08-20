@@ -4,7 +4,8 @@
     {
       "parameters": {
         "format": "resolved",
-        "options": {}
+        "options": {},
+        "postProcessAction": "nothing"
       },
       "type": "n8n-nodes-base.emailReadImap",
       "typeVersion": 2.2,
@@ -340,7 +341,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const folderMap = {\n  offre_fournisseur: 'Tri-Offre fournisseur',\n  confirmation_commande: 'Tri-Confirmation de commande',\n  prospects: 'Tri-Prospects',\n  suivi_client: 'Tri-SuiviClient',\n  administratif: 'Tri-Administratif',\n  litige: 'Tri-Litige',\n  facturation: 'Tri-Facturation',\n  spam: 'Spam'\n};\n\nconst item = $input.first().json;\nconst targetFolder = folderMap[item.categorie] || 'Tri-Administratif';\n\nreturn [{ json: { ...item, targetFolder } }];"
+        "jsCode": "const folderMap = {\n  offre_fournisseur: 'Tri-Offre fournisseur',\n  confirmation_commande: 'Tri-Confirmation de commande',\n  prospects: 'Tri-Prospects',\n  suivi_client: 'Tri-SuiviClient',\n  administratif: 'Tri-Administratif',\n  litige: 'Tri-Litige',\n  facturation: 'Tri-Facturation',\n  spam: 'Spam'\n};\n\nconst item = $input.first().json;\nconst targetFolder = folderMap[item.categorie] || 'Tri-Administratif';\n\n// Marqué comme lu uniquement si aucune action de votre part n'est nécessaire :\n// réponse déjà automatisée, ou spam. Sinon, reste non-lu pour le retrouver facilement.\nconst markAsRead = item.auto_envoi_possible === true || item.categorie === 'spam';\n\nreturn [{ json: { ...item, targetFolder, markAsRead } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -365,7 +366,7 @@
         "destinationMailbox": {
           "__rl": true,
           "mode": "path",
-          "value": "={{ $json.targetFolder }}"
+          "value": "={{ $('Déterminer dossier cible').item.json.targetFolder }}"
         }
       },
       "type": "n8n-nodes-imap.imap",
@@ -382,6 +383,84 @@
           "name": "IMAP Move - v.caufriez@ebanista.fr"
         }
       }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f1a1b111-0000-4000-8000-00000000f003",
+              "leftValue": "={{ $json.markAsRead }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1568,
+        200
+      ],
+      "id": "f1a1b111-0000-4000-8000-000000000022",
+      "name": "Faut-il marquer lu ?"
+    },
+    {
+      "parameters": {
+        "authentication": "imapThisNode",
+        "resource": "email",
+        "operation": "setEmailFlags",
+        "mailboxPath": {
+          "__rl": true,
+          "mode": "path",
+          "value": "INBOX"
+        },
+        "emailUid": "={{ $('Email Trigger (IMAP)').item.json.attributes.uid }}",
+        "flags": {
+          "\\Seen": true
+        }
+      },
+      "type": "n8n-nodes-imap.imap",
+      "typeVersion": 1,
+      "position": [
+        1792,
+        144
+      ],
+      "id": "f1a1b111-0000-4000-8000-000000000023",
+      "name": "Marquer comme lu",
+      "credentials": {
+        "imapApi": {
+          "id": "7D7EF7hYzLreslfS",
+          "name": "IMAP Move - v.caufriez@ebanista.fr"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1792,
+        144
+      ],
+      "id": "f1a1b111-0000-4000-8000-000000000024",
+      "name": "Attendre 8s",
+      "webhookId": "a0113614-411e-4451-8f6e-24805da6f086"
     }
   ],
   "connections": {
@@ -463,6 +542,11 @@
             "node": "Insert row",
             "type": "main",
             "index": 0
+          },
+          {
+            "node": "Auto-envoi possible ?",
+            "type": "main",
+            "index": 0
           }
         ]
       ]
@@ -491,6 +575,46 @@
       ]
     },
     "Déterminer dossier cible": {
+      "main": [
+        [
+          {
+            "node": "Faut-il marquer lu ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Faut-il marquer lu ?": {
+      "main": [
+        [
+          {
+            "node": "Marquer comme lu",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Déplacer le mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marquer comme lu": {
+      "main": [
+        [
+          {
+            "node": "Attendre 8s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attendre 8s": {
       "main": [
         [
           {
