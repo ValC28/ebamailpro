@@ -17,3 +17,5 @@ Backup 20260824_030001: committed and pushed
 time="2026-08-25T03:00:01Z" level=warning msg="/root/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
 Backup 20260825_030001: committed and pushed
 time="2026-08-26T03:00:01Z" level=warning msg="/root/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
+Backup 20260826_030001: committed and pushed
+time="2026-08-27T03:00:02Z" level=warning msg="/root/docker-compose.yml: the attribute `version` is obsolete, it will be ignored, please remove it to avoid potential confusion"
