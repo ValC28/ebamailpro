@@ -1,0 +1,232 @@
+{
+  "name": "Brouillon de réponse - contact",
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "a1000000-0000-4000-8000-000000000001",
+      "name": "Entrée sous-workflow"
+    },
+    {
+      "parameters": {
+        "authentication": "coreImapAccount",
+        "resource": "email",
+        "operation": "getEmailsList",
+        "mailboxPath": {
+          "__rl": true,
+          "mode": "path",
+          "value": "Sent"
+        },
+        "emailDateRange": {
+          "since": "={{ $now.minus({ years: 1 }).toISO() }}"
+        },
+        "emailSearchFilters": {
+          "to": "={{ $json.from_address || 'adresse-introuvable@invalid.invalid' }}"
+        },
+        "limit": 40,
+        "includeParts": [
+          "textContent"
+        ]
+      },
+      "type": "n8n-nodes-imap.imap",
+      "typeVersion": 1,
+      "position": [
+        260,
+        0
+      ],
+      "id": "a1000000-0000-4000-8000-000000000002",
+      "name": "Retrouver mes réponses précédentes",
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput",
+      "credentials": {
+        "imap": {
+          "id": "nFnyy1qJ60BZTKsw",
+          "name": "IMAP - contact@ebanista.fr"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Assemble le prompt : mail reçu + historique des réponses précédentes à ce correspondant\nconst src = $('Entrée sous-workflow').first().json;\nconst found = $input.all().map(i => i.json).filter(j => j && j.envelope && !j.error);\n\nconst ownText = (t) => String(t || '').replace(/\\r/g, '')\n  .split(/\\n(?:>|Le .{5,90} a écrit|De ?:|From:|-----Original|On .{5,90} wrote)/)[0].trim();\n\nconst history = found\n  .map(j => ({ date: new Date(j.envelope.date || 0), subject: j.envelope.subject || '', text: ownText(j.textContent) }))\n  .filter(h => h.text.length >= 30)\n  .sort((a, b) => b.date - a.date)\n  .slice(0, 3)\n  .map((h, n) => `--- Échange ${n + 1} (${h.date.toISOString().slice(0, 10)}, objet : ${h.subject}) ---\\n${h.text.slice(0, 700)}`)\n  .join('\\n\\n');\n\nconst body = String(src.text || '').trim().slice(0, 4000);\nconst prompt = [\n  'MAIL REÇU',\n  `De : ${src.from_name ? src.from_name + ' ' : ''}<${src.from_address}>`,\n  `Objet : ${src.subject}`,\n  `Date : ${src.date}`,\n  `Résumé (assistant de tri) : ${src.resume || ''}`,\n  '',\n  'Contenu :',\n  body || '(message sans texte)',\n  '',\n  'HISTORIQUE : tes dernières réponses à cet interlocuteur (de la plus récente à la plus ancienne)',\n  history || \"(aucun échange précédent trouvé : vouvoie par défaut)\",\n  '',\n  'Rédige le brouillon de réponse.'\n].join('\\n');\n\nreturn [{ json: { prompt, historyCount: history ? history.split('--- Échange ').length - 1 : 0 } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        0
+      ],
+      "id": "a1000000-0000-4000-8000-000000000003",
+      "name": "Assembler le contexte"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "SystemMessagePromptTemplate",
+              "message": "Tu rédiges des BROUILLONS de réponses d'e-mails pour la boîte administrative d'EBANISTA (menuiserie / ébénisterie sur mesure). Cette boîte sert au secrétariat, à la comptabilité, aux ressources humaines et aux échanges avec les clients et les fournisseurs. La personne qui la gère relira et modifiera chaque brouillon avant de l'envoyer : tu écris à sa place, dans son style.\n\nRéponds UNIQUEMENT avec le corps du message : pas d'objet, pas de commentaire, pas de guillemets, pas de balises.\n\nSTYLE (tiré des mails envoyés depuis cette boîte) :\n- Vouvoiement quasi systématique, ton poli, professionnel et courtois, sans familiarité. Tutoie uniquement si l'historique de ses échanges avec cette personne montre qu'elle la tutoie.\n- Salutation : \"Bonjour,\" ou \"Bonjour Prénom,\" ; \"Bonjour Madame Nom,\" / \"Bonjour Monsieur Nom,\" avec un interlocuteur formel. Mets un prénom ou un nom seulement si tu en es sûr.\n- Phrases complètes et claires, paragraphes courts (3 à 8 lignes en général). Formules typiques : \"Je reviens vers vous concernant …\", \"Merci pour votre retour.\", \"Merci beaucoup pour l'envoi de …\", \"Vous trouverez en pièce jointe …\", \"Je vous mets … en pièce jointe.\".\n- Demandes précises : \"Pourriez-vous …\", \"Serait-il possible de …\". Si plusieurs points, une liste à puces.\n- Avant la fin : \"Merci d'avance pour votre retour.\" ou \"Je vous remercie par avance pour votre retour.\"\n- Formule de fin : \"Cordialement,\" ou \"Bien cordialement,\", parfois \"Bonne journée,\" / \"Belle journée,\".\n- Signature : écris exactement [À COMPLÉTER : signature] sur la dernière ligne, sous la formule de fin.\n- Réclamation, litige ou retard (facture erronée, résiliation, livraison manquante) : ton ferme, calme et factuel ; rappelle les dates, références et faits qui figurent dans le mail reçu ; demande clairement ce qui est attendu et dans quel délai si le mail le permet.\n\nRÈGLES STRICTES :\n- N'invente JAMAIS un montant, un nombre d'heures, une date, un délai, un numéro de contrat ou de dossier, une référence, une quantité ni un engagement. Si une information nécessaire manque, écris [À COMPLÉTER : ce qu'il faut préciser] à l'endroit voulu.\n- Les DÉCISIONS ne sont jamais à ta charge : accepter ou refuser une offre, valider un devis, passer ou annuler une commande, payer, fixer une date, accorder un geste commercial, valider une demande d'un salarié. N'écris jamais \"oui\", \"c'est d'accord\", \"je confirme\" ou \"nous validons\" à sa place. Écris [À COMPLÉTER : décision à prendre (ce qu'il faut trancher)] ou une réponse neutre (accuser réception, demander une précision, dire que tu reviens vers l'interlocuteur).\n- N'ajoute AUCUNE précision (références, dimensions, quantités, noms de personnes, détails de paie ou de contrat) qui n'est pas dans le mail reçu, même si elle apparaît dans l'historique : l'historique ne sert qu'à choisir le ton (tu / vous), la salutation et la formule de fin. Ne reprends jamais d'informations personnelles d'un ancien échange.\n- Sujets sensibles (paie, ressources humaines, rupture de contrat, litiges juridiques) : reste neutre et prudent, n'engage pas l'entreprise, laisse [À COMPLÉTER] pour toute information ou décision.\n- Réponds à toutes les questions posées dans le mail reçu, point par point si nécessaire.\n- Écris en français, sauf si l'interlocuteur écrit dans une autre langue : réponds alors dans sa langue.\n- Ne cite pas l'historique et ne recopie pas le mail reçu."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        780,
+        0
+      ],
+      "id": "a1000000-0000-4000-8000-000000000004",
+      "name": "Rédiger le brouillon"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-6",
+          "cachedResultName": "Claude Sonnet 4.6"
+        },
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        820,
+        220
+      ],
+      "id": "a1000000-0000-4000-8000-000000000005",
+      "name": "Modèle Claude (brouillon)",
+      "credentials": {
+        "anthropicApi": {
+          "id": "FRxZizEr7zCaHHZp",
+          "name": "Claude API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compose un e-mail RFC822 (réponse) à enregistrer dans le dossier Brouillons\nconst src = $('Entrée sous-workflow').first().json;\nconst draft = String($input.first().json.text || '').trim();\nif (!draft) throw new Error('Brouillon vide renvoyé par le modèle');\n\nconst MY = { name: 'Ebanista', addr: 'contact@ebanista.fr' };\nconst CRLF = '\\r\\n';\nconst b64 = (s) => Buffer.from(s, 'utf8').toString('base64');\nconst isAscii = (s) => /^[\\x20-\\x7e]*$/.test(s);\n\n// en-tête non ASCII -> mots encodés (RFC 2047), découpés en petits morceaux\nconst encodeHeader = (s) => {\n  if (isAscii(s)) return s;\n  const chars = Array.from(s), parts = [];\n  for (let i = 0; i < chars.length; i += 10) parts.push(`=?UTF-8?B?${b64(chars.slice(i, i + 10).join(''))}?=`);\n  return parts.join(CRLF + ' ');\n};\nconst displayName = (name) => {\n  if (!name) return '';\n  // nom non ASCII : un seul mot encodé (le découper en plusieurs mots encodés le coupe à l'affichage)\n  if (!isAscii(name)) return `=?UTF-8?B?${b64(name)}?=`;\n  return /[^\\w .'-]/.test(name) ? `\"${name.replace(/([\"\\\\])/g, '\\\\$1')}\"` : name;\n};\n\nlet subject = String(src.subject || '').trim();\nwhile (/^(re|ré)\\s*:\\s*/i.test(subject)) subject = subject.replace(/^(re|ré)\\s*:\\s*/i, '');\nsubject = 'Re: ' + subject;\n\nconst origId = src.message_id ? (String(src.message_id).startsWith('<') ? src.message_id : `<${src.message_id}>`) : '';\nconst when = src.date ? new Date(src.date).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'long', timeStyle: 'short' }) : '';\nconst who = (src.from_name ? src.from_name + ' ' : '') + `<${src.from_address}>`;\nconst quoted = String(src.text || '').replace(/\\r/g, '').trim().slice(0, 3000).split('\\n').map(l => '> ' + l).join('\\n');\nconst text = `${draft}\\n\\n\\nLe ${when}, ${who} a écrit :\\n${quoted}\\n`;\n\nconst headers = [\n  `From: ${displayName(MY.name)} <${MY.addr}>`,\n  `To: ${src.from_name ? displayName(src.from_name) + ' ' : ''}<${src.from_address}>`,\n  `Subject: ${encodeHeader(subject)}`,\n  `Date: ${new Date().toUTCString().replace('GMT', '+0000')}`,\n  `Message-ID: <draft-${Date.now()}-${Math.random().toString(36).slice(2, 10)}@ebanista.fr>`,\n  ...(origId ? [`In-Reply-To: ${origId}`, `References: ${origId}`] : []),\n  'MIME-Version: 1.0',\n  'Content-Type: text/plain; charset=UTF-8',\n  'Content-Transfer-Encoding: base64',\n];\nconst bodyB64 = b64(text.replace(/\\n/g, CRLF)).replace(/(.{76})/g, '$1' + CRLF);\n\nreturn [{ json: { rfc822: headers.join(CRLF) + CRLF + CRLF + bodyB64 + CRLF, subject, draftPreview: draft } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "id": "a1000000-0000-4000-8000-000000000006",
+      "name": "Composer le brouillon"
+    },
+    {
+      "parameters": {
+        "authentication": "coreImapAccount",
+        "resource": "email",
+        "operation": "createDraft",
+        "destinationMailbox": {
+          "__rl": true,
+          "mode": "path",
+          "value": "Drafts"
+        },
+        "inputFormat": "rfc822",
+        "rfc822": "={{ $json.rfc822 }}"
+      },
+      "type": "n8n-nodes-imap.imap",
+      "typeVersion": 1,
+      "position": [
+        1360,
+        0
+      ],
+      "id": "a1000000-0000-4000-8000-000000000007",
+      "name": "Enregistrer dans Brouillons",
+      "credentials": {
+        "imap": {
+          "id": "nFnyy1qJ60BZTKsw",
+          "name": "IMAP - contact@ebanista.fr"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Entrée sous-workflow": {
+      "main": [
+        [
+          {
+            "node": "Retrouver mes réponses précédentes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrouver mes réponses précédentes": {
+      "main": [
+        [
+          {
+            "node": "Assembler le contexte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assembler le contexte": {
+      "main": [
+        [
+          {
+            "node": "Rédiger le brouillon",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modèle Claude (brouillon)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Rédiger le brouillon",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rédiger le brouillon": {
+      "main": [
+        [
+          {
+            "node": "Composer le brouillon",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Composer le brouillon": {
+      "main": [
+        [
+          {
+            "node": "Enregistrer dans Brouillons",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": true
+}

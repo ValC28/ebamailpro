@@ -1,0 +1,1821 @@
+{
+  "name": "Assistant e-mails Telegram",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "assistant-mails-0e623b6c920aa52f22bb7772",
+        "authentication": "headerAuth",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "b3043dde-80ab-4a28-bf9d-079dfd7c96ef",
+      "name": "Webhook Telegram",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "86dpp3Vg9wZOdnpT",
+          "name": "Pont Telegram (secret)"
+        }
+      },
+      "webhookId": "b3aefde1-f923-49a8-ae02-67f177128485"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Réception d'une mise à jour Telegram : filtre l'expéditeur, évite les doublons, retrouve la conversation en cours\nconst ALLOWED = 8848139246;\nconst upd = $input.first().json.body || {};\nconst sd = $getWorkflowStaticData('global');\nsd.seen = sd.seen || [];\nsd.sessions = sd.sessions || {};\n\nconst msg = upd.message, cb = upd.callback_query;\nconst from = (msg && msg.from) || (cb && cb.from) || {};\nconst chat = (msg && msg.chat) || (cb && cb.message && cb.message.chat) || {};\n\n// seul le compte de Valentin est autorisé : tout autre expéditeur est ignoré sans réponse\nif (Number(from.id) !== ALLOWED || Number(chat.id) !== ALLOWED) return [{ json: { route: 'ignore' } }];\n\n// une même mise à jour n'est jamais traitée deux fois\nif (upd.update_id !== undefined) {\n  if (sd.seen.includes(upd.update_id)) return [{ json: { route: 'ignore' } }];\n  sd.seen.push(upd.update_id);\n  if (sd.seen.length > 100) sd.seen = sd.seen.slice(-100);\n}\n\nconst key = String(chat.id);\nlet s = sd.sessions[key];\nif (s && Date.now() - (s.updated || 0) > 45 * 60 * 1000) { delete sd.sessions[key]; s = undefined; } // conversation expirée après 45 min\n\nlet route = 'message', text = '', pick = 0;\nif (cb) route = 'callback';\nelse if (msg && msg.text && s && s.state === 'reply_pick' && s.mail_candidates && /^\\s*[1-9]\\s*$/.test(msg.text)) { route = 'reply_choose'; pick = Number(msg.text.trim()); }\nelse if (msg && msg.text) route = 'claude';\nelse text = \"Je ne sais traiter que du texte pour l'instant. Écrivez-moi (ou dictez avec le clavier de votre téléphone) à qui écrire, le sujet et ce qu'il faut dire.\";\n\nreturn [{ json: {\n  route, text, pick, chat_id: chat.id, update_id: upd.update_id,\n  user_text: msg ? (msg.text || '') : '',\n  cb_data: cb ? (cb.data || '') : '', cb_id: cb ? cb.id : '',\n  session: s || null,\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        250,
+        0
+      ],
+      "id": "99722a57-f703-41b9-ab67-4bfa8ab07a76",
+      "name": "Normaliser la mise à jour"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e39c0628-d8ee-4975-81c7-8f41815a93d5",
+              "leftValue": "={{ $json.route }}",
+              "rightValue": "callback",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        500,
+        0
+      ],
+      "id": "b543d024-91e6-4ab3-b9e3-b22b0286b79d",
+      "name": "Bouton ?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "2a4ed0cd-f6d1-49d7-b286-a89ab94d5d5f",
+              "leftValue": "={{ $json.route }}",
+              "rightValue": "claude",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        500,
+        400
+      ],
+      "id": "575eedd5-2d6d-4ec7-a9c3-936e46b15c52",
+      "name": "Demande à Claude ?"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ String($json.text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2400,
+        400
+      ],
+      "id": "52fb5149-bd9d-4fd4-a266-d879016f0c83",
+      "name": "Message texte",
+      "credentials": {
+        "telegramApi": {
+          "id": "duvmoy6UkxnbnBdr",
+          "name": "Ebanista Mails"
+        }
+      },
+      "webhookId": "04fe3fea-0d69-4ea4-b0fd-6a328d15cf9c"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "97bc6334-b893-44db-851b-532955c2d5ad",
+              "leftValue": "={{ $json.route }}",
+              "rightValue": "reply_choose",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        750,
+        100
+      ],
+      "id": "754326a4-c4d1-4e82-8b7c-affc3e032e62",
+      "name": "Choix de mail ?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Valentin a répondu par un numéro : on retient le mail choisi dans la liste\nconst j = $('Normaliser la mise à jour').first().json;\nconst sd = $getWorkflowStaticData('global');\nconst key = String(j.chat_id);\nconst s = (sd.sessions || {})[key];\nconst say = (text) => [{ json: { chat_id: j.chat_id, text, next: 'message' } }];\nconst c = s && s.mail_candidates && s.mail_candidates[Number(j.pick) - 1];\nif (!c) return say(`Ce numéro ne correspond à aucun mail de la liste. Répondez par un numéro de 1 à ${(s && s.mail_candidates || []).length || 1}, ou reformulez votre demande.`);\nsd.sessions[key] = { state: 'reply_pending', reply_to: c, reply_pending: true, instructions: s.instructions || '', updated: Date.now() };\nreturn [{ json: { chat_id: j.chat_id, next: 'redraft', user_text: s.instructions || 'Rédige une réponse appropriée à ce mail.', session: sd.sessions[key] } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        0
+      ],
+      "id": "9967a7ec-4213-4ead-b5a2-558462c2408e",
+      "name": "Valider le choix"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "9a869b0b-48b2-47d8-9009-cc9c0c75033c",
+              "leftValue": "={{ $json.route }}",
+              "rightValue": "message",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1000,
+        200
+      ],
+      "id": "1023280c-dec8-4f6e-904e-ad6c67c6b4e9",
+      "name": "Message à envoyer ?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mise à jour ignorée (expéditeur non autorisé ou doublon) : on répond simplement 200 au relais\nreturn [{ json: { ignored: true } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        200
+      ],
+      "id": "fad372e7-477d-495e-810f-dc876b6ffaa9",
+      "name": "Ignorer"
+    },
+    {
+      "parameters": {
+        "resource": "callback",
+        "operation": "answerQuery",
+        "queryId": "={{ $json.cb_id }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        750,
+        -200
+      ],
+      "id": "e03002c2-1185-43c8-b7fa-3b6f82faa3a1",
+      "name": "Accuser réception du bouton",
+      "credentials": {
+        "telegramApi": {
+          "id": "duvmoy6UkxnbnBdr",
+          "name": "Ebanista Mails"
+        }
+      },
+      "onError": "continueRegularOutput",
+      "webhookId": "e6d62359-d104-49ba-9e33-8ae41c63ba29"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Traite un clic sur un bouton : annulation ou envoi (préparation du message à expédier)\nconst j = $('Normaliser la mise à jour').first().json;\nconst sd = $getWorkflowStaticData('global');\nsd.sessions = sd.sessions || {};\nconst key = String(j.chat_id);\nconst s = sd.sessions[key];\nconst say = (text) => [{ json: { chat_id: j.chat_id, text, next: 'message' } }];\n\nif (j.cb_data === 'cancel') { delete sd.sessions[key]; return say('Brouillon annulé.'); }\n// bouton « Répondre » d'une alerte urgente : on retrouve le mail par sa boîte et son identifiant\nconst rm = /^rep:(v|c):(\\d+)$/.exec(j.cb_data || '');\nif (rm) return [{ json: { chat_id: j.chat_id, next: 'find_uid', box_name: rm[1] === 'v' ? 'v.caufriez' : 'contact', uid: rm[2] } }];\nconst m = /^send:(v|c)$/.exec(j.cb_data || '');\nif (!m) return say('Action inconnue.');\nif (!s || s.state !== 'ready' || !s.draft || !s.draft.to_address || !s.draft.body) {\n  return say(\"Ce brouillon n'est plus en attente (déjà envoyé, annulé ou expiré). Redites-moi ce que vous voulez envoyer.\");\n}\nconst BOX = {\n  v: { from: 'v.caufriez@ebanista.fr', fromName: 'Valentin Caufriez', signature: 'Valentin Caufriez', label: 'v.caufriez@ebanista.fr' },\n  c: { from: 'contact@ebanista.fr', fromName: 'Ebanista', signature: \"L'équipe Ebanista\", label: 'contact@ebanista.fr' },\n}[m[1]];\ns.state = 'sending'; s.updated = Date.now();\nconst d = s.draft;\nlet text = `${d.body.replace(/\\s+$/, '')}\\n\\n${BOX.signature}`;\nconst r = s.reply_to;\nif (r) {\n  const when = r.recu_le ? new Date(r.recu_le).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', dateStyle: 'long', timeStyle: 'short' }) : '';\n  const quoted = String(r.extrait || '').replace(/\\r/g, '').trim().split('\\n').map(l => '> ' + l).join('\\n');\n  text += `\\n\\n\\nLe ${when}, ${r.from_name ? r.from_name + ' ' : ''}<${r.from_address}> a écrit :\\n${quoted}\\n`;\n}\nreturn [{ json: {\n  chat_id: j.chat_id, next: 'send', box: m[1], label: BOX.label,\n  from: BOX.from, fromName: BOX.fromName,\n  from_header: `${BOX.fromName} <${BOX.from}>`,\n  to: d.to_address, to_name: d.to_name || '', subject: d.subject || '(sans objet)',\n  in_reply_to: r && r.message_id ? r.message_id : '',\n  text,\n} }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        -200
+      ],
+      "id": "bda65198-e11c-4171-8405-245580e2382c",
+      "name": "Traiter le bouton"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "50779124-c098-4e42-86a8-6d95e6ef551d",
+              "leftValue": "={{ $json.next }}",
+              "rightValue": "send",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1250,
+        -200
+      ],
+      "id": "4aa43ec5-54a6-4d85-9c5c-1200f53bd1be",
+      "name": "Envoi demandé ?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "974c9e0c-79b1-4e0b-8473-dc50c1d3ac58",
+              "leftValue": "={{ $json.next }}",
+              "rightValue": "find_uid",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1450,
+        -450
+      ],
+      "id": "2786cb35-d2a4-4e0e-9650-34d919fddd7a",
+      "name": "Réponse par bouton ?"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ 'http://localhost:5678/api/v1/data-tables/xhFI6TwJikamYjPL/rows?limit=3&filter=' + encodeURIComponent(JSON.stringify({ type: 'and', filters: [{ columnName: 'boite', condition: 'eq', value: $json.box_name }, { columnName: 'uid', condition: 'eq', value: String($json.uid) }] })) }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1700,
+        -650
+      ],
+      "id": "a566dacf-29f1-4090-9468-fe3135db27f4",
+      "name": "Chercher le mail de l'alerte",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Lfuh7XFXewkeDjJe",
+          "name": "n8n API Key (interne)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Le mail de l'alerte est retrouvé : on prépare la conversation et on demande à Valentin ce qu'il veut répondre\nconst j = $('Normaliser la mise à jour').first().json;\nconst sd = $getWorkflowStaticData('global');\nsd.sessions = sd.sessions || {};\nconst key = String(j.chat_id);\nconst r = ($input.first().json.data || [])[0];\nconst say = (text) => [{ json: { chat_id: j.chat_id, text } }];\nif (!r) return say(\"Je n'ai pas retrouvé ce mail dans le registre (il date peut-être de plus de 45 jours). Dites-moi à quel mail répondre, par exemple « réponds au mail de … ».\");\nconst keep = { boite: r.boite, recu_le: r.recu_le, from_address: r.from_address, from_name: r.from_name, subject: r.subject, message_id: r.message_id, extrait: r.extrait, resume: r.resume };\nsd.sessions[key] = { state: 'reply_pending', reply_to: keep, reply_pending: true, instructions: '', updated: Date.now() };\nconst when = r.recu_le ? new Date(r.recu_le).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';\nreturn say(`↩️ Réponse au mail « ${(r.subject || '').slice(0, 80)} » de ${r.from_name ? r.from_name + ' ' : ''}<${r.from_address}> (reçu le ${when} sur ${r.boite}).\\n\\nQue voulez-vous répondre ? Dites-le-moi en quelques mots, ou écrivez « propose une réponse » et je prépare une réponse adaptée.`);\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1950,
+        -650
+      ],
+      "id": "d2c2266f-70eb-4f57-9850-5792dc9683cd",
+      "name": "Mail de l'alerte"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Confirme l'envoi à Valentin et clôt la conversation\nconst t = $('Traiter le bouton').first().json;\nconst sd = $getWorkflowStaticData('global');\nsd.sessions = sd.sessions || {};\ndelete sd.sessions[String(t.chat_id)];\nlet copyOk = true;\ntry {\n  const r = $input.first().json;\n  if (!r || r.error || r.deleted === false) copyOk = false;\n} catch (e) { copyOk = false; }\nreturn [{ json: { chat_id: t.chat_id, text: `✅ Mail envoyé depuis ${t.label}\\nÀ : ${t.to}\\nObjet : ${t.subject}` + (copyOk ? '\\nUne copie est enregistrée dans Envoyés.' : \"\\n⚠️ La copie dans Envoyés n'a pas pu être enregistrée.\") } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2150,
+        -200
+      ],
+      "id": "23bae847-8365-426e-8c8a-04f10232c89c",
+      "name": "Confirmer l'envoi"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ String($json.text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2400,
+        -200
+      ],
+      "id": "3011ce52-3689-4ce9-972a-cdb3df25fb95",
+      "name": "Confirmation Telegram",
+      "credentials": {
+        "telegramApi": {
+          "id": "duvmoy6UkxnbnBdr",
+          "name": "Ebanista Mails"
+        }
+      },
+      "webhookId": "6ee774f9-3bdb-4a79-9871-6809e28d4a16"
+    },
+    {
+      "parameters": {
+        "jsCode": "// L'envoi a échoué : on remet le brouillon en attente pour pouvoir réessayer\nconst t = $('Traiter le bouton').first().json;\nconst sd = $getWorkflowStaticData('global');\nconst s = (sd.sessions || {})[String(t.chat_id)];\nif (s) { s.state = 'ready'; s.updated = Date.now(); }\nlet why = '';\ntry { why = String($input.first().json.error && ($input.first().json.error.message || $input.first().json.error) || '').slice(0, 200); } catch (e) {}\nreturn [{ json: { chat_id: t.chat_id, text: `❌ L'envoi depuis ${t.label} a échoué${why ? ' : ' + why : ''}.\\nLe brouillon est conservé : vous pouvez réessayer avec le même bouton ou choisir l'autre boîte.` } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1900,
+        -500
+      ],
+      "id": "d6f2e372-441d-461f-8ca9-e13ee34b7fb5",
+      "name": "Échec de l'envoi"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "bcd22bbc-109f-449b-8a20-08b58ebe7bc9",
+              "leftValue": "={{ $json.box }}",
+              "rightValue": "v",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1450,
+        -200
+      ],
+      "id": "22b286f7-8af7-490f-b5a1-4b3f7dc98f03",
+      "name": "Boîte v.caufriez@ebanista.fr ?"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.from_header }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.text }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1700,
+        -200
+      ],
+      "id": "ebeace84-6fdc-454e-89e8-01f9d39df789",
+      "name": "Envoi depuis v.caufriez@ebanista.fr",
+      "credentials": {
+        "smtp": {
+          "id": "HpY9yQWKI4eEr1b8",
+          "name": "SMTP - v.caufriez@ebanista.fr"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "webhookId": "9657178f-bed0-428a-8011-06f40c8ed33a"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compose la copie du mail envoyé (RFC822) pour le dossier Envoyés de la boîte\nconst t = $('Traiter le bouton').first().json;\nconst info = $input.first().json;\nconst CRLF = '\\r\\n';\nconst b64 = (s) => Buffer.from(s, 'utf8').toString('base64');\nconst isAscii = (s) => /^[\\x20-\\x7e]*$/.test(s);\nconst encodeHeader = (s) => {\n  if (isAscii(s)) return s;\n  const chars = Array.from(s), parts = [];\n  for (let i = 0; i < chars.length; i += 10) parts.push(`=?UTF-8?B?${b64(chars.slice(i, i + 10).join(''))}?=`);\n  return parts.join(CRLF + ' ');\n};\nconst name = (n) => !n ? '' : (!isAscii(n) ? `=?UTF-8?B?${b64(n)}?=` : (/[^\\w .'-]/.test(n) ? `\"${n.replace(/([\"\\\\])/g, '\\\\$1')}\"` : n));\nconst msgId = info.messageId || `<copie-${Date.now()}@ebanista.fr>`;\nconst headers = [\n  `From: ${name(t.fromName)} <${t.from}>`,\n  `To: ${t.to_name ? name(t.to_name) + ' ' : ''}<${t.to}>`,\n  `Subject: ${encodeHeader(t.subject)}`,\n  `Date: ${new Date().toUTCString().replace('GMT', '+0000')}`,\n  `Message-ID: ${msgId}`,\n  ...(t.in_reply_to ? [`In-Reply-To: ${t.in_reply_to}`, `References: ${t.in_reply_to}`] : []),\n  'MIME-Version: 1.0',\n  'Content-Type: text/plain; charset=UTF-8',\n  'Content-Transfer-Encoding: base64',\n];\nconst body = b64(t.text.replace(/\\r?\\n/g, CRLF)).replace(/(.{76})/g, '$1' + CRLF);\nreturn [{ json: { rfc822: headers.join(CRLF) + CRLF + CRLF + body + CRLF } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1900,
+        -200
+      ],
+      "id": "fecd0c92-9f95-4df5-90f7-301c6e8a17fb",
+      "name": "Composer la copie v"
+    },
+    {
+      "parameters": {
+        "authentication": "coreImapAccount",
+        "resource": "email",
+        "operation": "createDraft",
+        "destinationMailbox": {
+          "__rl": true,
+          "mode": "path",
+          "value": "Sent"
+        },
+        "inputFormat": "rfc822",
+        "rfc822": "={{ $json.rfc822 }}"
+      },
+      "type": "n8n-nodes-imap.imap",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        -200
+      ],
+      "id": "d1a9bdbb-5d70-4a16-a5f0-8714584951a3",
+      "name": "Enregistrer la copie v",
+      "credentials": {
+        "imap": {
+          "id": "wVKdbE1JQnIB1kzf",
+          "name": "IMAP - v.caufriez@ebanista.fr"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "authentication": "coreImapAccount",
+        "resource": "email",
+        "operation": "setEmailFlags",
+        "mailboxPath": {
+          "__rl": true,
+          "mode": "path",
+          "value": "Sent"
+        },
+        "emailUid": "={{ $json.uid }}",
+        "flags": {
+          "\\Seen": true,
+          "\\Draft": false
+        }
+      },
+      "type": "n8n-nodes-imap.imap",
+      "typeVersion": 1,
+      "position": [
+        2100,
+        -200
+      ],
+      "id": "889e773b-e120-4f82-bf77-7f3764b84307",
+      "name": "Marquer la copie lue v",
+      "credentials": {
+        "imap": {
+          "id": "wVKdbE1JQnIB1kzf",
+          "name": "IMAP - v.caufriez@ebanista.fr"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "fromEmail": "={{ $json.from_header }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.text }}",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1700,
+        50
+      ],
+      "id": "1b1369c2-ed7b-48fa-8614-59b2cc778424",
+      "name": "Envoi depuis contact@ebanista.fr",
+      "credentials": {
+        "smtp": {
+          "id": "4znohlVNgQDzDtyl",
+          "name": "SMTP - contact@ebanista.fr"
+        }
+      },
+      "onError": "continueErrorOutput",
+      "webhookId": "76d2f5df-653f-4dce-b5c7-849498fad771"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Compose la copie du mail envoyé (RFC822) pour le dossier Envoyés de la boîte\nconst t = $('Traiter le bouton').first().json;\nconst info = $input.first().json;\nconst CRLF = '\\r\\n';\nconst b64 = (s) => Buffer.from(s, 'utf8').toString('base64');\nconst isAscii = (s) => /^[\\x20-\\x7e]*$/.test(s);\nconst encodeHeader = (s) => {\n  if (isAscii(s)) return s;\n  const chars = Array.from(s), parts = [];\n  for (let i = 0; i < chars.length; i += 10) parts.push(`=?UTF-8?B?${b64(chars.slice(i, i + 10).join(''))}?=`);\n  return parts.join(CRLF + ' ');\n};\nconst name = (n) => !n ? '' : (!isAscii(n) ? `=?UTF-8?B?${b64(n)}?=` : (/[^\\w .'-]/.test(n) ? `\"${n.replace(/([\"\\\\])/g, '\\\\$1')}\"` : n));\nconst msgId = info.messageId || `<copie-${Date.now()}@ebanista.fr>`;\nconst headers = [\n  `From: ${name(t.fromName)} <${t.from}>`,\n  `To: ${t.to_name ? name(t.to_name) + ' ' : ''}<${t.to}>`,\n  `Subject: ${encodeHeader(t.subject)}`,\n  `Date: ${new Date().toUTCString().replace('GMT', '+0000')}`,\n  `Message-ID: ${msgId}`,\n  ...(t.in_reply_to ? [`In-Reply-To: ${t.in_reply_to}`, `References: ${t.in_reply_to}`] : []),\n  'MIME-Version: 1.0',\n  'Content-Type: text/plain; charset=UTF-8',\n  'Content-Transfer-Encoding: base64',\n];\nconst body = b64(t.text.replace(/\\r?\\n/g, CRLF)).replace(/(.{76})/g, '$1' + CRLF);\nreturn [{ json: { rfc822: headers.join(CRLF) + CRLF + CRLF + body + CRLF } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1900,
+        50
+      ],
+      "id": "cd08a6c1-1a47-46ce-8d67-b9146a38d676",
+      "name": "Composer la copie c"
+    },
+    {
+      "parameters": {
+        "authentication": "coreImapAccount",
+        "resource": "email",
+        "operation": "createDraft",
+        "destinationMailbox": {
+          "__rl": true,
+          "mode": "path",
+          "value": "Sent"
+        },
+        "inputFormat": "rfc822",
+        "rfc822": "={{ $json.rfc822 }}"
+      },
+      "type": "n8n-nodes-imap.imap",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        50
+      ],
+      "id": "5a44b535-71c0-475d-9df4-89395e62fbbf",
+      "name": "Enregistrer la copie c",
+      "credentials": {
+        "imap": {
+          "id": "nFnyy1qJ60BZTKsw",
+          "name": "IMAP - contact@ebanista.fr"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "authentication": "coreImapAccount",
+        "resource": "email",
+        "operation": "setEmailFlags",
+        "mailboxPath": {
+          "__rl": true,
+          "mode": "path",
+          "value": "Sent"
+        },
+        "emailUid": "={{ $json.uid }}",
+        "flags": {
+          "\\Seen": true,
+          "\\Draft": false
+        }
+      },
+      "type": "n8n-nodes-imap.imap",
+      "typeVersion": 1,
+      "position": [
+        2100,
+        50
+      ],
+      "id": "657fbf61-ae01-4a76-9413-939a656d6a6c",
+      "name": "Marquer la copie lue c",
+      "credentials": {
+        "imap": {
+          "id": "nFnyy1qJ60BZTKsw",
+          "name": "IMAP - contact@ebanista.fr"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construit le message envoyé à Claude : demande de Valentin + brouillon en cours + adresses proposées + éventuel mail reçu auquel répondre\nconst j = $input.first().json;\nconst s = j.session;\nconst parts = ['MESSAGE DE VALENTIN :', j.user_text];\nif (s && s.reply_to) {\n  const r = s.reply_to;\n  parts.push('', 'MAIL REÇU AUQUEL TU RÉPONDS :',\n    `De : ${r.from_name ? r.from_name + ' ' : ''}<${r.from_address}>`,\n    `Objet : ${r.subject}`, `Reçu le : ${r.recu_le}`, `Boîte de réception : ${r.boite}`,\n    'Contenu :', r.extrait || '(vide)');\n  if (r.boite === 'contact') {\n    parts.push('', \"STYLE POUR CETTE BOÎTE (administrative) : vouvoiement soigné, phrases complètes et courtoises, \\\"Merci d'avance pour votre retour.\\\" avant la formule de fin (\\\"Cordialement,\\\"), aucune familiarité. Écris au nom de l'entreprise (« nous »), pas à la première personne du singulier.\");\n  }\n}\nif (s && s.draft && s.draft.body) {\n  const d = s.draft;\n  parts.push('', 'BROUILLON EN COURS :', `À : ${d.to_name || ''} <${d.to_address || 'adresse inconnue'}>`, `Objet : ${d.subject || ''}`, 'Corps :', d.body);\n}\nif (s && s.candidates && s.candidates.length) {\n  parts.push('', 'ADRESSES PROPOSÉES POUR LE DESTINATAIRE (il peut répondre par un numéro) :');\n  s.candidates.forEach((c, i) => parts.push(`${i + 1}) ${c.name ? c.name + ' ' : ''}<${c.address}>`));\n}\nreturn [{ json: { ...j, prompt: parts.join('\\n') } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        750,
+        400
+      ],
+      "id": "5064ae5b-0d7d-4a5e-9e0c-8cc2e0f1c5f5",
+      "name": "Préparer l'appel Claude"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "SystemMessagePromptTemplate",
+              "message": "Tu es l'assistant de rédaction d'e-mails de Valentin Caufriez, gérant d'EBANISTA (menuiserie / ébénisterie sur mesure). Valentin te dicte par Telegram, en langage courant, un e-mail à envoyer (destinataire, sujet, contenu). Tu rédiges l'e-mail à sa place, dans son style ; ensuite il choisit la boîte d'envoi et valide.\n\nTu reçois son message, et éventuellement le brouillon en cours (à réviser) et une liste numérotée d'adresses proposées.\n\nRéponds UNIQUEMENT par un objet JSON, sans texte autour :\n{\n  \"intent\": \"draft\" | \"revise\" | \"reply\" | \"cancel\" | \"other\",\n  \"to_name\": \"nom du destinataire\" ou null,\n  \"to_address\": \"adresse e-mail\" ou null,\n  \"subject\": \"objet\" ou null,\n  \"body\": \"corps complet du mail, formule de politesse comprise, SANS signature\" ou null,\n  \"reply\": \"message court à afficher à Valentin\" ou null,\n  \"find\": {\"sender\": \"expéditeur, société ou personne cité(e)\" ou null, \"subject\": \"mots du sujet cités\" ou null, \"box\": \"v.caufriez\" | \"contact\" | null} ou null,\n  \"instructions\": \"ce que Valentin veut dire dans la réponse\" ou null\n}\n\nINTENTIONS :\n- \"draft\" : nouvelle demande d'e-mail.\n- \"revise\" : il modifie le brouillon en cours (ajoute, retire, raccourcit, change le ton, corrige un détail). Change uniquement ce qui est demandé, garde le reste, et renvoie le mail complet à jour.\n- \"reply\" : il demande de RÉPONDRE à un mail déjà reçu (« réponds au mail de Dispano sur le devis », « réponds à Mme Martin », « réponds au dernier mail de contact »). Renseigne \"find\" (qui a écrit, mots du sujet, boîte si précisée) et \"instructions\" (ce qu'il veut dire dans la réponse, ou null s'il ne dit rien). Ne rédige PAS la réponse à ce stade : \"body\" reste null. Aucune adresse n'est nécessaire.\n- \"cancel\" : il abandonne ce brouillon.\n- Dans le champ \"reply\", vouvoie toujours Valentin.\n- \"other\" : ce n'est pas une demande de mail (question, remerciement, message flou). Réponds brièvement dans \"reply\" et explique au besoin comment demander un mail : à qui, quel sujet, ce qu'il faut dire.\n\nDESTINATAIRE :\n- to_address : seulement si une adresse figure dans son message ou dans le brouillon en cours, ou s'il choisit un numéro dans la liste d'adresses proposées. N'invente JAMAIS une adresse e-mail. Sinon null (avec to_name si tu as un nom).\n- Si l'objet n'est pas dicté, propose un objet court et pertinent.\n\nRÉPONSE À UN MAIL REÇU :\n- Si le message contient un bloc \"MAIL REÇU AUQUEL TU RÉPONDS\", rédige la réponse à ce mail : intent \"draft\" (ou \"revise\" si un brouillon existe déjà), et renvoie seulement le corps de la réponse dans \"body\". to_address, to_name et subject seront remplis automatiquement : mets-les à null.\n- Réponds précisément à ce que dit le mail reçu, en suivant les instructions de Valentin. Ne cite pas le mail reçu (il sera cité automatiquement). Applique les mêmes règles d'invention et de style.\n\nSTYLE DU CORPS (celui de Valentin) :\n- Court et direct, 3 à 8 lignes en général, paragraphes très courts, aucune formule ampoulée.\n- Vouvoiement par défaut ; tutoiement (\"Salut Prénom,\") seulement s'il le demande ou indique que le destinataire est un proche ou un fournisseur habituel.\n- COHÉRENCE : choisis une seule forme (vouvoiement OU tutoiement) et garde-la dans tout le mail, salutation et formule de politesse comprises. Ne mélange jamais \"vous\" et \"tu\", ni \"Bonjour,\" avec du tutoiement.\n- Salutation : \"Bonjour,\" ou \"Bonjour Prénom,\" ; \"Salut Prénom,\" en tutoiement.\n- Commandes et demandes de prix : liste à tirets, une quantité ou une référence par ligne.\n- Termine par une formule de politesse seule : \"Cordialement,\" (ou \"À bientôt,\" / \"Bien à toi,\" en tutoiement). Ne mets AUCUN nom ni signature après : la signature est ajoutée automatiquement.\n\nRÈGLES STRICTES :\n- N'invente JAMAIS un prix, un délai, une date, une quantité, une référence, une dimension ni un engagement qu'il n'a pas dicté. S'il manque une information indispensable, écris [À COMPLÉTER : ce qu'il faut préciser] à l'endroit voulu.\n- RÉCLAMATION OU LITIGE : ton calme, factuel et ferme. Ne présente aucune excuse, ne reconnais aucune faute et ne promets aucun geste commercial, délai ou solution que Valentin n'a pas dictés ; accuse simplement réception et laisse [À COMPLÉTER : ce que Valentin répond / décide] pour la position à prendre.\n- Ne mets pas l'objet dans le corps. N'ajoute ni commentaire, ni \"Voici le mail\".\n- Écris en français, sauf si Valentin demande une autre langue."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        1000,
+        400
+      ],
+      "id": "7890e1df-9f4a-49eb-950f-1cccd64e3949",
+      "name": "Rédiger avec Claude"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-6",
+          "cachedResultName": "Claude Sonnet 4.6"
+        },
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        1040,
+        620
+      ],
+      "id": "8cf84447-f369-4131-a353-1f54dae5ea7e",
+      "name": "Modèle Claude (assistant)",
+      "credentials": {
+        "anthropicApi": {
+          "id": "FRxZizEr7zCaHHZp",
+          "name": "Claude API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Applique la réponse de Claude à la conversation (brouillon, réponse à un mail, annulation, question) et décide de la suite\nconst j = $('Normaliser la mise à jour').first().json;\nconst raw = String($input.first().json.text || '');\nlet out = null;\ntry { out = JSON.parse(raw.match(/\\{[\\s\\S]*\\}/)[0]); } catch (e) { out = null; }\n\nconst sd = $getWorkflowStaticData('global');\nsd.sessions = sd.sessions || {};\nconst key = String(j.chat_id);\nconst prev = sd.sessions[key];\nconst say = (text) => [{ json: { chat_id: j.chat_id, text, next: 'message' } }];\nconst reSubject = (s) => 'Re: ' + String(s || '').replace(/^\\s*((re|ré)\\s*:\\s*)+/i, '').trim();\n\nif (!out) return say(\"Je n'ai pas bien compris. Pouvez-vous reformuler votre demande ?\");\nif (out.intent === 'cancel') { delete sd.sessions[key]; return say('Brouillon annulé.'); }\nif (out.intent === 'other') return say(out.reply || \"Dites-moi à qui écrire, le sujet et ce qu'il faut dire (ou « réponds au mail de … »), et je prépare le mail.\");\n\n// demande de réponse à un mail déjà reçu : on retrouve d'abord le mail dans le registre\nif (out.intent === 'reply') {\n  sd.sessions[key] = { state: 'reply_search', find: out.find || {}, instructions: out.instructions || '', updated: Date.now() };\n  return [{ json: { chat_id: j.chat_id, next: 'find' } }];\n}\n\nconst okMail = (a) => (typeof a === 'string' && /^[^\\s@<>]+@[^\\s@<>]+\\.[^\\s@<>]+$/.test(a.trim())) ? a.trim() : null;\nconst d = (prev && prev.draft) || {};\n\n// réponse à un mail reçu (première rédaction, ou révision d'un brouillon de réponse)\nconst replyTo = prev && prev.reply_to;\nif (replyTo && (prev.reply_pending || (out.intent === 'revise' && prev.draft))) {\n  const body = out.body || d.body || null;\n  const nd = { to_name: replyTo.from_name || null, to_address: replyTo.from_address, subject: reSubject(replyTo.subject), body };\n  sd.sessions[key] = { state: 'draft', draft: nd, reply_to: replyTo, candidates: null, updated: Date.now() };\n  if (!body) return say(out.reply || 'Que voulez-vous répondre ?');\n  return [{ json: { chat_id: j.chat_id, next: 'decide', lookup_name: '' } }];\n}\n\nlet nd;\nif (out.intent === 'revise' && prev && prev.draft) {\n  nd = {\n    to_name: out.to_name || d.to_name || null,\n    to_address: okMail(out.to_address) || d.to_address || null,\n    subject: out.subject || d.subject || null,\n    body: out.body || d.body || null,\n  };\n} else {\n  nd = { to_name: out.to_name || null, to_address: okMail(out.to_address), subject: out.subject || null, body: out.body || null };\n}\nsd.sessions[key] = { state: 'draft', draft: nd, candidates: null, updated: Date.now() };\n\nif (!nd.body) return say(out.reply || 'Que voulez-vous dire dans ce mail ?');\nconst needLookup = !nd.to_address && !!nd.to_name;\nreturn [{ json: { chat_id: j.chat_id, next: needLookup ? 'lookup' : 'decide', lookup_name: nd.to_name || '' } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1250,
+        400
+      ],
+      "id": "e68a944d-32bf-40b9-9299-11d098bf35fe",
+      "name": "Appliquer la réponse de Claude"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d052ad90-f49f-4e88-975d-c2db7bcd3cfc",
+              "leftValue": "={{ $json.next }}",
+              "rightValue": "message",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1500,
+        400
+      ],
+      "id": "af6fe65c-0ed1-4838-b2fc-143333d506ea",
+      "name": "Message direct ?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "0ba637a4-f5ee-4b95-8656-ce516dfbfc98",
+              "leftValue": "={{ $json.next }}",
+              "rightValue": "find",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1750,
+        800
+      ],
+      "id": "386ca447-a66d-47c3-a94b-c77956ed20c2",
+      "name": "Chercher un mail ?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "128fb10c-fbfb-4a9e-84ad-14ab32968ed0",
+              "leftValue": "={{ $json.next }}",
+              "rightValue": "lookup",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1750,
+        550
+      ],
+      "id": "2d72c5d5-efeb-48de-b65a-8939dc6c5442",
+      "name": "Recherche d'adresse ?"
+    },
+    {
+      "parameters": {
+        "authentication": "coreImapAccount",
+        "resource": "email",
+        "operation": "getEmailsList",
+        "mailboxPath": {
+          "__rl": true,
+          "mode": "path",
+          "value": "Sent"
+        },
+        "emailDateRange": {
+          "since": "={{ $now.minus({ years: 2 }).toISO() }}"
+        },
+        "emailSearchFilters": {
+          "to": "={{ ($('Appliquer la réponse de Claude').first().json.lookup_name || '').split(/\\s+/).filter(Boolean).sort((a, b) => b.length - a.length)[0] || 'introuvable-xyz' }}"
+        },
+        "limit": 40,
+        "includeParts": []
+      },
+      "type": "n8n-nodes-imap.imap",
+      "typeVersion": 1,
+      "position": [
+        2000,
+        700
+      ],
+      "id": "bc9211b5-139f-4b17-b251-2d4e7c11fdb0",
+      "name": "Recherche Envoyés v.caufriez",
+      "credentials": {
+        "imap": {
+          "id": "wVKdbE1JQnIB1kzf",
+          "name": "IMAP - v.caufriez@ebanista.fr"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Regroupe en un seul élément les résultats de la recherche dans les Envoyés de v.caufriez@\nconst found = $input.all().map(i => i.json).filter(j => j && j.envelope && !j.error);\nreturn [{ json: { found } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        700
+      ],
+      "id": "5a5b383e-df4e-4ca2-bac9-ba4a6cbb4aa1",
+      "name": "Regrouper les résultats v.caufriez"
+    },
+    {
+      "parameters": {
+        "authentication": "coreImapAccount",
+        "resource": "email",
+        "operation": "getEmailsList",
+        "mailboxPath": {
+          "__rl": true,
+          "mode": "path",
+          "value": "Sent"
+        },
+        "emailDateRange": {
+          "since": "={{ $now.minus({ years: 2 }).toISO() }}"
+        },
+        "emailSearchFilters": {
+          "to": "={{ ($('Appliquer la réponse de Claude').first().json.lookup_name || '').split(/\\s+/).filter(Boolean).sort((a, b) => b.length - a.length)[0] || 'introuvable-xyz' }}"
+        },
+        "limit": 40,
+        "includeParts": []
+      },
+      "type": "n8n-nodes-imap.imap",
+      "typeVersion": 1,
+      "position": [
+        2400,
+        700
+      ],
+      "id": "930621dd-fc2d-4f58-bb53-d4b0231b0e8d",
+      "name": "Recherche Envoyés contact",
+      "credentials": {
+        "imap": {
+          "id": "nFnyy1qJ60BZTKsw",
+          "name": "IMAP - contact@ebanista.fr"
+        }
+      },
+      "alwaysOutputData": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Retrouve l'adresse du destinataire à partir de son nom, dans les dossiers Envoyés des deux boîtes\nconst ctx = $('Appliquer la réponse de Claude').first().json;\nconst j = $('Normaliser la mise à jour').first().json;\nconst sd = $getWorkflowStaticData('global');\nconst key = String(j.chat_id);\nconst s = sd.sessions[key];\nconst strip = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');\nconst tokens = strip(ctx.lookup_name).split(/[^a-z0-9]+/).filter(t => t.length >= 2);\n\nconst first = ($('Regrouper les résultats v.caufriez').first().json.found) || [];\nconst second = $input.all().map(i => i.json).filter(x => x && x.envelope && !x.error);\nconst MINE = ['v.caufriez@ebanista.fr', 'contact@ebanista.fr', 'comptabilite@ebanista.fr'];\nconst tally = {};\nfor (const m of [...first, ...second]) {\n  for (const t of ((m.envelope && m.envelope.to) || [])) {\n    const addr = String(t.address || '').toLowerCase();\n    if (!addr || MINE.includes(addr)) continue;\n    const hay = strip((t.name || '') + ' ' + addr);\n    if (tokens.length && !tokens.every(tok => hay.includes(tok))) continue;\n    const e = tally[addr] || (tally[addr] = { address: addr, name: t.name || '', count: 0 });\n    e.count++;\n    if (!e.name && t.name) e.name = t.name;\n  }\n}\nconst list = Object.values(tally).sort((a, b) => b.count - a.count);\nif (s) {\n  if (list.length === 1 || (list.length > 1 && list[0].count >= 2 * list[1].count && list[0].count >= 2)) {\n    s.draft.to_address = list[0].address;\n    if (!s.draft.to_name && list[0].name) s.draft.to_name = list[0].name;\n  } else if (list.length > 1) {\n    s.candidates = list.slice(0, 5).map(c => ({ name: c.name, address: c.address }));\n  }\n  s.updated = Date.now();\n}\nreturn [{ json: { chat_id: j.chat_id } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2600,
+        700
+      ],
+      "id": "deda7146-ab3b-4e9b-8d21-ad834419388a",
+      "name": "Retrouver l'adresse"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Décide ce qu'il faut répondre à Valentin : question sur l'adresse, informations manquantes, ou aperçu avec boutons\nconst j = $('Normaliser la mise à jour').first().json;\nconst sd = $getWorkflowStaticData('global');\nconst key = String(j.chat_id);\nconst s = sd.sessions[key];\nconst out = (text, preview = false) => {\n  const rec = s && s.reply_to ? s.reply_to.boite : '';\n  const tag = ' (boîte du mail reçu)';\n  return [{ json: { chat_id: j.chat_id, text, preview,\n    label_v: '✉️ Envoyer depuis v.caufriez@ebanista.fr' + (rec === 'v.caufriez' ? tag : ''),\n    label_c: '✉️ Envoyer depuis contact@ebanista.fr' + (rec === 'contact' ? tag : '') } }];\n};\nif (!s || !s.draft) return out(\"Je n'ai plus de brouillon en cours. Redites-moi à qui écrire et ce qu'il faut dire.\");\nconst d = s.draft;\n\nif (s.candidates && s.candidates.length) {\n  s.state = 'awaiting_address'; s.updated = Date.now();\n  const lines = s.candidates.map((c, i) => `${i + 1}) ${c.name ? c.name + ' ' : ''}<${c.address}>`).join('\\n');\n  return out(`Plusieurs adresses possibles pour « ${d.to_name || 'ce destinataire'} » :\\n${lines}\\n\\nRépondez par le numéro, ou donnez-moi directement l'adresse.`);\n}\nif (!d.to_address) {\n  s.state = 'awaiting_address'; s.updated = Date.now();\n  return out(`Je n'ai pas trouvé l'adresse e-mail de ${d.to_name || 'ce destinataire'}. Pouvez-vous me la donner ?`);\n}\nconst missing = (d.body.match(/\\[À COMPLÉTER[^\\]]*\\]/g) || []);\nconst r = s.reply_to;\nconst when = r && r.recu_le ? new Date(r.recu_le).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';\nconst head = r ? `↩️ Réponse au mail « ${(r.subject || '').slice(0, 80)} » reçu le ${when} sur ${r.boite}\\n\\n` : '';\nconst draftText = `À : ${d.to_name ? d.to_name + ' ' : ''}<${d.to_address}>\\nObjet : ${d.subject || '(sans objet)'}\\n\\n${d.body}`;\nif (missing.length) {\n  s.state = 'awaiting_info'; s.updated = Date.now();\n  return out(`Il manque des informations avant de pouvoir envoyer :\\n${missing.map(m => '• ' + m).join('\\n')}\\n\\nPrécisez-les-moi et je mets le brouillon à jour.\\n\\n— Brouillon actuel —\\n${head}${draftText}`);\n}\ns.state = 'ready'; s.updated = Date.now();\nreturn out(`✉️ Brouillon prêt\\n\\n${head}${draftText}\\n\\n(La signature est ajoutée selon la boîte choisie${r ? ', et le mail d\\'origine est cité en dessous' : ''}.)\\nChoisissez la boîte d'envoi, ou dites-moi quoi modifier.`, true);\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2800,
+        550
+      ],
+      "id": "2e1c009f-001a-4a99-8108-0833209eb8de",
+      "name": "Décider du message"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "7229f0c6-c3cd-4562-a3fa-a3cdee790070",
+              "leftValue": "={{ String($json.preview) }}",
+              "rightValue": "true",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3050,
+        550
+      ],
+      "id": "6f6303e8-21ba-4923-bff0-582f9908c671",
+      "name": "Aperçu ?"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://localhost:5678/api/v1/data-tables/xhFI6TwJikamYjPL/rows?limit=250&sortBy=recu_le%3Adesc",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2000,
+        900
+      ],
+      "id": "d1cf2515-0515-46f4-91f4-3bf5a826fbbc",
+      "name": "Chercher dans le registre",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Lfuh7XFXewkeDjJe",
+          "name": "n8n API Key (interne)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Retrouve dans le registre le mail reçu auquel Valentin veut répondre\nconst j = $('Normaliser la mise à jour').first().json;\nconst sd = $getWorkflowStaticData('global');\nconst key = String(j.chat_id);\nconst s = (sd.sessions || {})[key];\nconst say = (text) => [{ json: { chat_id: j.chat_id, text, next: 'message' } }];\nif (!s || s.state !== 'reply_search') return say(\"Je n'ai plus de demande en cours. Redites-moi à quel mail répondre.\");\n\nconst rows = ($input.first().json.data || []).filter(r => r && r.from_address);\nconst f = s.find || {};\nconst strip = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');\nconst toks = (t) => strip(t).split(/[^a-z0-9]+/).filter(x => x.length >= 2);\nconst st = toks(f.sender), jt = toks(f.subject);\nconst bx = strip(f.box || '');\nconst boxOk = (r) => !bx || (bx.includes('contact') ? r.boite === 'contact' : (bx.includes('caufriez') || bx.includes('valentin')) ? r.boite === 'v.caufriez' : true);\n\nlet list = rows.filter(r => {\n  if (!boxOk(r)) return false;\n  const who = strip((r.from_name || '') + ' ' + r.from_address);\n  if (st.length && !st.every(t => who.includes(t))) return false;\n  return true;\n});\nif (jt.length) {\n  const what = (r) => strip((r.subject || '') + ' ' + (r.resume || ''));\n  const strict = list.filter(r => jt.every(t => what(r).includes(t)));\n  list = strict.length ? strict : list.filter(r => jt.some(t => what(r).includes(t)));\n}\nlist.sort((a, b) => String(b.recu_le).localeCompare(String(a.recu_le)));\nconst top = list.slice(0, 5);\n\nconst keep = (r) => ({ boite: r.boite, recu_le: r.recu_le, from_address: r.from_address, from_name: r.from_name, subject: r.subject, message_id: r.message_id, extrait: r.extrait, resume: r.resume });\nconst fmt = (r) => {\n  const d = r.recu_le ? new Date(r.recu_le).toLocaleString('fr-FR', { timeZone: 'Europe/Paris', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : '';\n  return `${r.from_name ? r.from_name + ' ' : ''}<${r.from_address}> — « ${(r.subject || '').slice(0, 70)} » — ${d} — boîte ${r.boite}`;\n};\n\nif (top.length === 0) {\n  delete sd.sessions[key];\n  return say(\"Je n'ai pas retrouvé de mail correspondant dans les 45 derniers jours (boîtes v.caufriez et contact). Précisez l'expéditeur ou un mot de l'objet.\");\n}\nif (top.length > 1) {\n  s.state = 'reply_pick'; s.mail_candidates = top.map(keep); s.updated = Date.now();\n  return say(`Plusieurs mails correspondent :\\n${top.map((r, i) => `${i + 1}) ${fmt(r)}`).join('\\n')}\\n\\nRépondez par le numéro du mail auquel répondre.`);\n}\nconst chosen = keep(top[0]);\nsd.sessions[key] = { state: 'reply_pending', reply_to: chosen, reply_pending: true, instructions: s.instructions || '', updated: Date.now() };\nreturn [{ json: { chat_id: j.chat_id, next: 'redraft', user_text: s.instructions || 'Rédige une réponse appropriée à ce mail.', session: sd.sessions[key] } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2250,
+        900
+      ],
+      "id": "6ead3293-5a10-4a18-a511-1235e48660bd",
+      "name": "Retrouver le mail"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "37edd01b-1ccd-492f-94a7-83d7df810ff2",
+              "leftValue": "={{ $json.next }}",
+              "rightValue": "redraft",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        2500,
+        900
+      ],
+      "id": "1ec82af3-d5b2-4324-ad46-032405f5cdeb",
+      "name": "Réponse à rédiger ?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Construit le message envoyé à Claude : demande de Valentin + brouillon en cours + adresses proposées + éventuel mail reçu auquel répondre\nconst j = $input.first().json;\nconst s = j.session;\nconst parts = ['MESSAGE DE VALENTIN :', j.user_text];\nif (s && s.reply_to) {\n  const r = s.reply_to;\n  parts.push('', 'MAIL REÇU AUQUEL TU RÉPONDS :',\n    `De : ${r.from_name ? r.from_name + ' ' : ''}<${r.from_address}>`,\n    `Objet : ${r.subject}`, `Reçu le : ${r.recu_le}`, `Boîte de réception : ${r.boite}`,\n    'Contenu :', r.extrait || '(vide)');\n  if (r.boite === 'contact') {\n    parts.push('', \"STYLE POUR CETTE BOÎTE (administrative) : vouvoiement soigné, phrases complètes et courtoises, \\\"Merci d'avance pour votre retour.\\\" avant la formule de fin (\\\"Cordialement,\\\"), aucune familiarité. Écris au nom de l'entreprise (« nous »), pas à la première personne du singulier.\");\n  }\n}\nif (s && s.draft && s.draft.body) {\n  const d = s.draft;\n  parts.push('', 'BROUILLON EN COURS :', `À : ${d.to_name || ''} <${d.to_address || 'adresse inconnue'}>`, `Objet : ${d.subject || ''}`, 'Corps :', d.body);\n}\nif (s && s.candidates && s.candidates.length) {\n  parts.push('', 'ADRESSES PROPOSÉES POUR LE DESTINATAIRE (il peut répondre par un numéro) :');\n  s.candidates.forEach((c, i) => parts.push(`${i + 1}) ${c.name ? c.name + ' ' : ''}<${c.address}>`));\n}\nreturn [{ json: { ...j, prompt: parts.join('\\n') } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2750,
+        900
+      ],
+      "id": "ce403b74-bee0-4137-8988-0450e95fe537",
+      "name": "Préparer l'appel Claude (réponse)"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.prompt }}",
+        "messages": {
+          "messageValues": [
+            {
+              "type": "SystemMessagePromptTemplate",
+              "message": "Tu es l'assistant de rédaction d'e-mails de Valentin Caufriez, gérant d'EBANISTA (menuiserie / ébénisterie sur mesure). Valentin te dicte par Telegram, en langage courant, un e-mail à envoyer (destinataire, sujet, contenu). Tu rédiges l'e-mail à sa place, dans son style ; ensuite il choisit la boîte d'envoi et valide.\n\nTu reçois son message, et éventuellement le brouillon en cours (à réviser) et une liste numérotée d'adresses proposées.\n\nRéponds UNIQUEMENT par un objet JSON, sans texte autour :\n{\n  \"intent\": \"draft\" | \"revise\" | \"reply\" | \"cancel\" | \"other\",\n  \"to_name\": \"nom du destinataire\" ou null,\n  \"to_address\": \"adresse e-mail\" ou null,\n  \"subject\": \"objet\" ou null,\n  \"body\": \"corps complet du mail, formule de politesse comprise, SANS signature\" ou null,\n  \"reply\": \"message court à afficher à Valentin\" ou null,\n  \"find\": {\"sender\": \"expéditeur, société ou personne cité(e)\" ou null, \"subject\": \"mots du sujet cités\" ou null, \"box\": \"v.caufriez\" | \"contact\" | null} ou null,\n  \"instructions\": \"ce que Valentin veut dire dans la réponse\" ou null\n}\n\nINTENTIONS :\n- \"draft\" : nouvelle demande d'e-mail.\n- \"revise\" : il modifie le brouillon en cours (ajoute, retire, raccourcit, change le ton, corrige un détail). Change uniquement ce qui est demandé, garde le reste, et renvoie le mail complet à jour.\n- \"reply\" : il demande de RÉPONDRE à un mail déjà reçu (« réponds au mail de Dispano sur le devis », « réponds à Mme Martin », « réponds au dernier mail de contact »). Renseigne \"find\" (qui a écrit, mots du sujet, boîte si précisée) et \"instructions\" (ce qu'il veut dire dans la réponse, ou null s'il ne dit rien). Ne rédige PAS la réponse à ce stade : \"body\" reste null. Aucune adresse n'est nécessaire.\n- \"cancel\" : il abandonne ce brouillon.\n- Dans le champ \"reply\", vouvoie toujours Valentin.\n- \"other\" : ce n'est pas une demande de mail (question, remerciement, message flou). Réponds brièvement dans \"reply\" et explique au besoin comment demander un mail : à qui, quel sujet, ce qu'il faut dire.\n\nDESTINATAIRE :\n- to_address : seulement si une adresse figure dans son message ou dans le brouillon en cours, ou s'il choisit un numéro dans la liste d'adresses proposées. N'invente JAMAIS une adresse e-mail. Sinon null (avec to_name si tu as un nom).\n- Si l'objet n'est pas dicté, propose un objet court et pertinent.\n\nRÉPONSE À UN MAIL REÇU :\n- Si le message contient un bloc \"MAIL REÇU AUQUEL TU RÉPONDS\", rédige la réponse à ce mail : intent \"draft\" (ou \"revise\" si un brouillon existe déjà), et renvoie seulement le corps de la réponse dans \"body\". to_address, to_name et subject seront remplis automatiquement : mets-les à null.\n- Réponds précisément à ce que dit le mail reçu, en suivant les instructions de Valentin. Ne cite pas le mail reçu (il sera cité automatiquement). Applique les mêmes règles d'invention et de style.\n\nSTYLE DU CORPS (celui de Valentin) :\n- Court et direct, 3 à 8 lignes en général, paragraphes très courts, aucune formule ampoulée.\n- Vouvoiement par défaut ; tutoiement (\"Salut Prénom,\") seulement s'il le demande ou indique que le destinataire est un proche ou un fournisseur habituel.\n- COHÉRENCE : choisis une seule forme (vouvoiement OU tutoiement) et garde-la dans tout le mail, salutation et formule de politesse comprises. Ne mélange jamais \"vous\" et \"tu\", ni \"Bonjour,\" avec du tutoiement.\n- Salutation : \"Bonjour,\" ou \"Bonjour Prénom,\" ; \"Salut Prénom,\" en tutoiement.\n- Commandes et demandes de prix : liste à tirets, une quantité ou une référence par ligne.\n- Termine par une formule de politesse seule : \"Cordialement,\" (ou \"À bientôt,\" / \"Bien à toi,\" en tutoiement). Ne mets AUCUN nom ni signature après : la signature est ajoutée automatiquement.\n\nRÈGLES STRICTES :\n- N'invente JAMAIS un prix, un délai, une date, une quantité, une référence, une dimension ni un engagement qu'il n'a pas dicté. S'il manque une information indispensable, écris [À COMPLÉTER : ce qu'il faut préciser] à l'endroit voulu.\n- RÉCLAMATION OU LITIGE : ton calme, factuel et ferme. Ne présente aucune excuse, ne reconnais aucune faute et ne promets aucun geste commercial, délai ou solution que Valentin n'a pas dictés ; accuse simplement réception et laisse [À COMPLÉTER : ce que Valentin répond / décide] pour la position à prendre.\n- Ne mets pas l'objet dans le corps. N'ajoute ni commentaire, ni \"Voici le mail\".\n- Écris en français, sauf si Valentin demande une autre langue."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        3000,
+        900
+      ],
+      "id": "09bc27c4-eb4d-4a62-a928-76df721a1471",
+      "name": "Rédiger la réponse avec Claude"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-6",
+          "cachedResultName": "Claude Sonnet 4.6"
+        },
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        3040,
+        1100
+      ],
+      "id": "e832f48f-7ec4-496f-a874-f68aa46ecf87",
+      "name": "Modèle Claude (réponse)",
+      "credentials": {
+        "anthropicApi": {
+          "id": "FRxZizEr7zCaHHZp",
+          "name": "Claude API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Applique la réponse de Claude à la conversation (brouillon, réponse à un mail, annulation, question) et décide de la suite\nconst j = $('Normaliser la mise à jour').first().json;\nconst raw = String($input.first().json.text || '');\nlet out = null;\ntry { out = JSON.parse(raw.match(/\\{[\\s\\S]*\\}/)[0]); } catch (e) { out = null; }\n\nconst sd = $getWorkflowStaticData('global');\nsd.sessions = sd.sessions || {};\nconst key = String(j.chat_id);\nconst prev = sd.sessions[key];\nconst say = (text) => [{ json: { chat_id: j.chat_id, text, next: 'message' } }];\nconst reSubject = (s) => 'Re: ' + String(s || '').replace(/^\\s*((re|ré)\\s*:\\s*)+/i, '').trim();\n\nif (!out) return say(\"Je n'ai pas bien compris. Pouvez-vous reformuler votre demande ?\");\nif (out.intent === 'cancel') { delete sd.sessions[key]; return say('Brouillon annulé.'); }\nif (out.intent === 'other') return say(out.reply || \"Dites-moi à qui écrire, le sujet et ce qu'il faut dire (ou « réponds au mail de … »), et je prépare le mail.\");\n\n// demande de réponse à un mail déjà reçu : on retrouve d'abord le mail dans le registre\nif (out.intent === 'reply') {\n  sd.sessions[key] = { state: 'reply_search', find: out.find || {}, instructions: out.instructions || '', updated: Date.now() };\n  return [{ json: { chat_id: j.chat_id, next: 'find' } }];\n}\n\nconst okMail = (a) => (typeof a === 'string' && /^[^\\s@<>]+@[^\\s@<>]+\\.[^\\s@<>]+$/.test(a.trim())) ? a.trim() : null;\nconst d = (prev && prev.draft) || {};\n\n// réponse à un mail reçu (première rédaction, ou révision d'un brouillon de réponse)\nconst replyTo = prev && prev.reply_to;\nif (replyTo && (prev.reply_pending || (out.intent === 'revise' && prev.draft))) {\n  const body = out.body || d.body || null;\n  const nd = { to_name: replyTo.from_name || null, to_address: replyTo.from_address, subject: reSubject(replyTo.subject), body };\n  sd.sessions[key] = { state: 'draft', draft: nd, reply_to: replyTo, candidates: null, updated: Date.now() };\n  if (!body) return say(out.reply || 'Que voulez-vous répondre ?');\n  return [{ json: { chat_id: j.chat_id, next: 'decide', lookup_name: '' } }];\n}\n\nlet nd;\nif (out.intent === 'revise' && prev && prev.draft) {\n  nd = {\n    to_name: out.to_name || d.to_name || null,\n    to_address: okMail(out.to_address) || d.to_address || null,\n    subject: out.subject || d.subject || null,\n    body: out.body || d.body || null,\n  };\n} else {\n  nd = { to_name: out.to_name || null, to_address: okMail(out.to_address), subject: out.subject || null, body: out.body || null };\n}\nsd.sessions[key] = { state: 'draft', draft: nd, candidates: null, updated: Date.now() };\n\nif (!nd.body) return say(out.reply || 'Que voulez-vous dire dans ce mail ?');\nconst needLookup = !nd.to_address && !!nd.to_name;\nreturn [{ json: { chat_id: j.chat_id, next: needLookup ? 'lookup' : 'decide', lookup_name: nd.to_name || '' } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        3250,
+        900
+      ],
+      "id": "c8095336-d55e-4f6f-b444-f1103d54f828",
+      "name": "Appliquer la réponse (réponse)"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "e184b349-efbc-47ee-812a-99c197ec2e11",
+              "leftValue": "={{ $json.next }}",
+              "rightValue": "decide",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        3500,
+        900
+      ],
+      "id": "b174350d-bd4c-4512-a69f-8d902c69f045",
+      "name": "Réponse prête ?"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ String($json.text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "={{ $json.label_v }}",
+                    "additionalFields": {
+                      "callback_data": "send:v"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "={{ $json.label_c }}",
+                    "additionalFields": {
+                      "callback_data": "send:c"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "❌ Annuler",
+                    "additionalFields": {
+                      "callback_data": "cancel"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        3300,
+        450
+      ],
+      "id": "f21f97a5-4f98-4334-ad02-956b72c0d613",
+      "name": "Aperçu avec boutons",
+      "credentials": {
+        "telegramApi": {
+          "id": "duvmoy6UkxnbnBdr",
+          "name": "Ebanista Mails"
+        }
+      },
+      "webhookId": "e39ae424-0fa1-444d-8ddc-fd08687661b3"
+    }
+  ],
+  "connections": {
+    "Webhook Telegram": {
+      "main": [
+        [
+          {
+            "node": "Normaliser la mise à jour",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normaliser la mise à jour": {
+      "main": [
+        [
+          {
+            "node": "Bouton ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bouton ?": {
+      "main": [
+        [
+          {
+            "node": "Accuser réception du bouton",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Demande à Claude ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Demande à Claude ?": {
+      "main": [
+        [
+          {
+            "node": "Préparer l'appel Claude",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Choix de mail ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Choix de mail ?": {
+      "main": [
+        [
+          {
+            "node": "Valider le choix",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message à envoyer ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message à envoyer ?": {
+      "main": [
+        [
+          {
+            "node": "Message texte",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Ignorer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Accuser réception du bouton": {
+      "main": [
+        [
+          {
+            "node": "Traiter le bouton",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Traiter le bouton": {
+      "main": [
+        [
+          {
+            "node": "Envoi demandé ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envoi demandé ?": {
+      "main": [
+        [
+          {
+            "node": "Boîte v.caufriez@ebanista.fr ?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Réponse par bouton ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Réponse par bouton ?": {
+      "main": [
+        [
+          {
+            "node": "Chercher le mail de l'alerte",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message texte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chercher le mail de l'alerte": {
+      "main": [
+        [
+          {
+            "node": "Mail de l'alerte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mail de l'alerte": {
+      "main": [
+        [
+          {
+            "node": "Message texte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confirmer l'envoi": {
+      "main": [
+        [
+          {
+            "node": "Confirmation Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Échec de l'envoi": {
+      "main": [
+        [
+          {
+            "node": "Message texte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Boîte v.caufriez@ebanista.fr ?": {
+      "main": [
+        [
+          {
+            "node": "Envoi depuis v.caufriez@ebanista.fr",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Envoi depuis contact@ebanista.fr",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envoi depuis v.caufriez@ebanista.fr": {
+      "main": [
+        [
+          {
+            "node": "Composer la copie v",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Échec de l'envoi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Composer la copie v": {
+      "main": [
+        [
+          {
+            "node": "Enregistrer la copie v",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enregistrer la copie v": {
+      "main": [
+        [
+          {
+            "node": "Marquer la copie lue v",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marquer la copie lue v": {
+      "main": [
+        [
+          {
+            "node": "Confirmer l'envoi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envoi depuis contact@ebanista.fr": {
+      "main": [
+        [
+          {
+            "node": "Composer la copie c",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Échec de l'envoi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Composer la copie c": {
+      "main": [
+        [
+          {
+            "node": "Enregistrer la copie c",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enregistrer la copie c": {
+      "main": [
+        [
+          {
+            "node": "Marquer la copie lue c",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marquer la copie lue c": {
+      "main": [
+        [
+          {
+            "node": "Confirmer l'envoi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modèle Claude (assistant)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Rédiger avec Claude",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer l'appel Claude": {
+      "main": [
+        [
+          {
+            "node": "Rédiger avec Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rédiger avec Claude": {
+      "main": [
+        [
+          {
+            "node": "Appliquer la réponse de Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Appliquer la réponse de Claude": {
+      "main": [
+        [
+          {
+            "node": "Message direct ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message direct ?": {
+      "main": [
+        [
+          {
+            "node": "Message texte",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Chercher un mail ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chercher un mail ?": {
+      "main": [
+        [
+          {
+            "node": "Chercher dans le registre",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Recherche d'adresse ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recherche d'adresse ?": {
+      "main": [
+        [
+          {
+            "node": "Recherche Envoyés v.caufriez",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Décider du message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recherche Envoyés v.caufriez": {
+      "main": [
+        [
+          {
+            "node": "Regrouper les résultats v.caufriez",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Regrouper les résultats v.caufriez": {
+      "main": [
+        [
+          {
+            "node": "Recherche Envoyés contact",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recherche Envoyés contact": {
+      "main": [
+        [
+          {
+            "node": "Retrouver l'adresse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrouver l'adresse": {
+      "main": [
+        [
+          {
+            "node": "Décider du message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chercher dans le registre": {
+      "main": [
+        [
+          {
+            "node": "Retrouver le mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retrouver le mail": {
+      "main": [
+        [
+          {
+            "node": "Réponse à rédiger ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Valider le choix": {
+      "main": [
+        [
+          {
+            "node": "Réponse à rédiger ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Réponse à rédiger ?": {
+      "main": [
+        [
+          {
+            "node": "Préparer l'appel Claude (réponse)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message texte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modèle Claude (réponse)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Rédiger la réponse avec Claude",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Préparer l'appel Claude (réponse)": {
+      "main": [
+        [
+          {
+            "node": "Rédiger la réponse avec Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rédiger la réponse avec Claude": {
+      "main": [
+        [
+          {
+            "node": "Appliquer la réponse (réponse)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Appliquer la réponse (réponse)": {
+      "main": [
+        [
+          {
+            "node": "Réponse prête ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Réponse prête ?": {
+      "main": [
+        [
+          {
+            "node": "Décider du message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message texte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Décider du message": {
+      "main": [
+        [
+          {
+            "node": "Aperçu ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aperçu ?": {
+      "main": [
+        [
+          {
+            "node": "Aperçu avec boutons",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message texte",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": true
+}

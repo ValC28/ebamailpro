@@ -1,0 +1,74 @@
+{
+  "name": "Nettoyage du registre des mails reçus",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 4 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "da88aa7d-1723-409c-ac04-84529c05fa01",
+      "name": "Chaque nuit à 4h"
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "http://localhost:5678/api/v1/data-tables/xhFI6TwJikamYjPL/rows/delete",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "filter",
+              "value": "={{ JSON.stringify({ type: 'and', filters: [{ columnName: 'recu_le', condition: 'lt', value: $now.minus({ days: 45 }).toUTC().toISO() }] }) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        0
+      ],
+      "id": "93f687ee-ad11-424c-8368-99e84c999d73",
+      "name": "Supprimer les mails de plus de 45 jours",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "Lfuh7XFXewkeDjJe",
+          "name": "n8n API Key (interne)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Chaque nuit à 4h": {
+      "main": [
+        [
+          {
+            "node": "Supprimer les mails de plus de 45 jours",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": true
+}

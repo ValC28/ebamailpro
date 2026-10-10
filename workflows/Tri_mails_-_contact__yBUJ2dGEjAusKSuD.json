@@ -1,10 +1,12 @@
 {
-  "name": "Tri mails - v.caufriez",
+  "name": "Tri mails - contact",
   "nodes": [
     {
       "parameters": {
         "format": "resolved",
-        "options": {},
+        "options": {
+          "customEmailConfig": "[\"UNSEEN\", [\"SINCE\", \"Oct 9, 2026\"]]"
+        },
         "postProcessAction": "nothing"
       },
       "type": "n8n-nodes-base.emailReadImap",
@@ -17,8 +19,8 @@
       "name": "Email Trigger (IMAP)",
       "credentials": {
         "imap": {
-          "id": "wVKdbE1JQnIB1kzf",
-          "name": "IMAP - v.caufriez@ebanista.fr"
+          "id": "nFnyy1qJ60BZTKsw",
+          "name": "IMAP - contact@ebanista.fr"
         }
       }
     },
@@ -29,7 +31,7 @@
         "messages": {
           "messageValues": [
             {
-              "message": "Tu es un assistant qui trie les emails professionnels d'une entreprise de menuiserie/ébénisterie (EBANISTA). Pour chaque email, réponds UNIQUEMENT en JSON avec cette structure exacte :\n{\n  \"categorie\": \"offre_fournisseur\" | \"confirmation_commande\" | \"prospects\" | \"suivi_client\" | \"administratif\" | \"litige\" | \"facturation\" | \"spam\",\n  \"urgent\": true ou false,\n  \"resume\": \"résumé en 2-3 lignes maximum\",\n  \"auto_envoi_possible\": true ou false,\n  \"reponse_requise\": true ou false\n}\n\nCatégories (avec exemples) :\n- offre_fournisseur : devis, propositions commerciales ou catalogues reçus d'un fournisseur. Ex : \"Devis panneaux MDF - validité 30 jours\"\n- confirmation_commande : accusés de réception ou confirmations d'une commande déjà passée à un fournisseur. Ex : \"Confirmation de votre commande n°4521\"\n- prospects : demandes d'information ou de devis de particuliers/entreprises intéressés par nos services. Ex : \"Devis pour cuisine sur mesure\"\n- suivi_client : échanges avec des clients déjà engagés sur un projet en cours. Ex : \"Où en est mon meuble ?\"\n- administratif : courriers officiels, banque, assurance, impôts, RH. Ex : \"Relevé bancaire disponible\"\n- litige : réclamation, mise en demeure, mention d'avocat/tribunal, forte insatisfaction client. TOUJOURS urgent=true et auto_envoi_possible=false.\n- facturation : factures reçues ou envoyées, relances de paiement. Ex : \"Facture n°2026-045\"\n- spam : newsletters, publicités, phishing évident, démarchage commercial non sollicité sans rapport avec l'activité.\n\nRègles d'urgence :\n- Ne pas se fier au mot \"urgent\" dans le sujet s'il n'est pas justifié par le contenu réel (une simple question commerciale n'est pas urgente même si le sujet dit \"urgent\").\n- Est urgent : litige (toujours), délai serré explicite (\"réponse avant demain\"), problème bloquant sur un chantier en cours, client insatisfait qui réclame.\n\nRègles auto_envoi_possible :\n- true UNIQUEMENT pour : accusé de réception simple sans action requise, confirmation de rdv déjà validée, confirmation_commande (accusé fournisseur).\n- false pour tout le reste, en particulier : offre_fournisseur, devis, facture, litige, toute demande nécessitant une réponse personnalisée ou une décision métier.\n\nRègles reponse_requise :\n- true si l'expéditeur attend une vraie réponse rédigée de Valentin : question, demande de devis ou de prix, demande de rendez-vous ou de disponibilité, relance, réclamation, proposition à accepter ou refuser.\n- false pour : spam, notifications et mails automatiques (y compris les réponses automatiques d'absence), accusés de réception et confirmations sans question, factures et relevés sans question, newsletters, mails reçus seulement en copie pour information.\n\nLe résumé doit être factuel et concis, sans reformuler tout l'email."
+              "message": "Tu es un assistant qui trie les emails professionnels d'une entreprise de menuiserie/ébénisterie (EBANISTA). Pour chaque email, réponds UNIQUEMENT en JSON avec cette structure exacte :\n{\n  \"categorie\": \"offre_fournisseur\" | \"confirmation_commande\" | \"prospects\" | \"suivi_client\" | \"administratif\" | \"litige\" | \"facturation\" | \"spam\",\n  \"urgent\": true ou false,\n  \"resume\": \"résumé en 2-3 lignes maximum\",\n  \"auto_envoi_possible\": true ou false,\n  \"reponse_requise\": true ou false\n}\n\nCatégories (avec exemples) :\n- offre_fournisseur : devis, propositions commerciales ou catalogues reçus d'un fournisseur. Ex : \"Devis panneaux MDF - validité 30 jours\"\n- confirmation_commande : accusés de réception ou confirmations d'une commande déjà passée à un fournisseur. Ex : \"Confirmation de votre commande n°4521\"\n- prospects : demandes d'information ou de devis de particuliers/entreprises intéressés par nos services. Ex : \"Devis pour cuisine sur mesure\"\n- suivi_client : échanges avec des clients déjà engagés sur un projet en cours. Ex : \"Où en est mon meuble ?\"\n- administratif : courriers officiels, banque, assurance, impôts, RH. Ex : \"Relevé bancaire disponible\"\n- litige : réclamation, mise en demeure, mention d'avocat/tribunal, forte insatisfaction client. TOUJOURS urgent=true et auto_envoi_possible=false.\n- facturation : factures reçues ou envoyées, relances de paiement. Ex : \"Facture n°2026-045\"\n- spam : newsletters, publicités, phishing évident, démarchage commercial non sollicité sans rapport avec l'activité.\n\nRègles d'urgence :\n- Ne pas se fier au mot \"urgent\" dans le sujet s'il n'est pas justifié par le contenu réel (une simple question commerciale n'est pas urgente même si le sujet dit \"urgent\").\n- Est urgent : litige (toujours), délai serré explicite (\"réponse avant demain\"), problème bloquant sur un chantier en cours, client insatisfait qui réclame.\n\nRègles auto_envoi_possible :\n- true UNIQUEMENT pour : accusé de réception simple sans action requise, confirmation de rdv déjà validée, confirmation_commande (accusé fournisseur).\n- false pour tout le reste, en particulier : offre_fournisseur, devis, facture, litige, toute demande nécessitant une réponse personnalisée ou une décision métier.\n\nRègles reponse_requise :\n- true si l'expéditeur attend une vraie réponse rédigée de l'entreprise : question, demande de devis ou de prix, demande de rendez-vous ou de disponibilité, relance, réclamation, proposition à accepter ou refuser.\n- false pour : spam, notifications et mails automatiques (y compris les réponses automatiques d'absence), accusés de réception et confirmations sans question, factures et relevés sans question, newsletters, mails reçus seulement en copie pour information.\n\nLe résumé doit être factuel et concis, sans reformuler tout l'email."
             }
           ]
         },
@@ -119,7 +121,7 @@
     {
       "parameters": {
         "chatId": "8848139246",
-        "text": "={{ (\"🚨 Mail urgent reçu\\n\\nDe : \" + ($('Email Trigger (IMAP)').item.json.from.text) + \"\\nCatégorie : \" + ($json.categorie) + \"\\n\\n\" + ($json.resume) + \"\\n\").replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}",
+        "text": "={{ (\"🚨 Mail urgent reçu sur contact@ebanista.fr\\n\\nDe : \" + ($('Email Trigger (IMAP)').item.json.from.text) + \"\\nCatégorie : \" + ($json.categorie) + \"\\n\\n\" + ($json.resume) + \"\\n\").replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}",
         "additionalFields": {
           "appendAttribution": false,
           "parse_mode": "HTML"
@@ -133,7 +135,7 @@
                   {
                     "text": "↩️ Répondre",
                     "additionalFields": {
-                      "callback_data": "={{ 'rep:v:' + $('Email Trigger (IMAP)').item.json.attributes.uid }}"
+                      "callback_data": "={{ 'rep:c:' + $('Email Trigger (IMAP)').item.json.attributes.uid }}"
                     }
                   }
                 ]
@@ -150,13 +152,13 @@
       ],
       "id": "a00d2675-2c89-4e0f-b077-76de969ad947",
       "name": "Send a text message",
-      "webhookId": "98c72095-6cdf-4118-b2eb-fece056cf3aa",
       "credentials": {
         "telegramApi": {
           "id": "duvmoy6UkxnbnBdr",
           "name": "Ebanista Mails"
         }
-      }
+      },
+      "webhookId": "a600d746-3b8d-4db2-9fe2-d27ca8ef438f"
     },
     {
       "parameters": {
@@ -170,11 +172,12 @@
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "auto_envoye": "={{ $json.auto_envoi_possible }}",
+            "auto_envoye": "={{ false }}",
             "expediteur": "={{ $('Email Trigger (IMAP)').item.json.from.text }}",
             "categorie": "={{ $json.categorie }}",
             "resume": "={{ $json.resume }}",
-            "date": "={{ $now.format('yyyy-MM-dd HH:mm') }}"
+            "date": "={{ $now.format('yyyy-MM-dd HH:mm') }}",
+            "boite": "contact"
           },
           "matchingColumns": [],
           "schema": [
@@ -225,6 +228,16 @@
               "defaultMatch": false,
               "display": true,
               "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "boite",
+              "displayName": "boite",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
               "readOnly": false,
               "removed": false
             }
@@ -278,99 +291,7 @@
     },
     {
       "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 3
-          },
-          "conditions": [
-            {
-              "id": "f1a1b111-0000-4000-8000-00000000f002",
-              "leftValue": "={{ $json.auto_envoi_possible }}",
-              "rightValue": "",
-              "operator": {
-                "type": "boolean",
-                "operation": "true",
-                "singleValue": true
-              }
-            },
-            {
-              "id": "f1a1b111-0000-4000-8000-00000000f004",
-              "leftValue": "={{ $('Email Trigger (IMAP)').item.json.from.text }}",
-              "rightValue": "/(no[-_. ]?reply|ne[-_. ]?pas[-_. ]?r[eé]pondre|do[-_. ]?not[-_. ]?reply|mailer-daemon|postmaster|bounces?@)/i",
-              "operator": {
-                "type": "string",
-                "operation": "notRegex"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2.3,
-      "position": [
-        1568,
-        432
-      ],
-      "id": "f1a1b111-0000-4000-8000-000000000011",
-      "name": "Auto-envoi possible ?"
-    },
-    {
-      "parameters": {
-        "fromEmail": "v.caufriez@ebanista.fr",
-        "toEmail": "={{ $('Email Trigger (IMAP)').item.json.from.text }}",
-        "subject": "=Re: {{ $('Email Trigger (IMAP)').item.json.subject }}",
-        "text": "={{ $json.text }}",
-        "options": {
-          "appendAttribution": false
-        },
-        "emailFormat": "text"
-      },
-      "type": "n8n-nodes-base.emailSend",
-      "typeVersion": 2.1,
-      "position": [
-        2016,
-        432
-      ],
-      "id": "f1a1b111-0000-4000-8000-000000000012",
-      "name": "Envoyer accusé de réception",
-      "credentials": {
-        "smtp": {
-          "id": "HpY9yQWKI4eEr1b8",
-          "name": "SMTP - v.caufriez@ebanista.fr"
-        }
-      },
-      "webhookId": "6f85610d-11ce-4c46-a2c5-3fa634b90499"
-    },
-    {
-      "parameters": {
-        "promptType": "define",
-        "text": "=Voici l'email reçu à confirmer :\nExpéditeur : {{ $('Email Trigger (IMAP)').item.json.from.text }}\nSujet : {{ $('Email Trigger (IMAP)').item.json.subject }}\nContenu : {{ $('Email Trigger (IMAP)').item.json.text }}\n\nRédige un accusé de réception personnalisé pour cet email.",
-        "messages": {
-          "messageValues": [
-            {
-              "message": "Tu rédiges des accusés de réception courts et personnalisés au nom d'EBANISTA (entreprise de menuiserie/ébénisterie), en réponse à un email reçu.\n\nRéponds UNIQUEMENT avec le corps du texte de l'email de réponse : pas de JSON, pas de sujet, pas de formule d'introduction du type \"Voici votre réponse\", juste le message tel qu'il sera envoyé.\n\nConsignes :\n- 3 à 5 lignes maximum, en français, ton chaleureux et professionnel\n- Fais référence brièvement à l'objet de sa demande pour montrer que le message a été lu\n- Ne promets aucun délai précis ni aucune information que tu ne connais pas\n- Termine par une formule de politesse et la signature \"L'équipe EBANISTA\""
-            }
-          ]
-        },
-        "batching": {}
-      },
-      "type": "@n8n/n8n-nodes-langchain.chainLlm",
-      "typeVersion": 1.9,
-      "position": [
-        1792,
-        336
-      ],
-      "id": "f1a1b111-0000-4000-8000-000000000013",
-      "name": "Rédiger accusé personnalisé"
-    },
-    {
-      "parameters": {
-        "jsCode": "const folderMap = {\n  offre_fournisseur: 'Tri-Offre fournisseur',\n  confirmation_commande: 'Tri-Confirmation de commande',\n  prospects: 'Tri-Prospects',\n  suivi_client: 'Tri-SuiviClient',\n  administratif: 'Tri-Administratif',\n  litige: 'Tri-Litige',\n  facturation: 'Tri-Facturation',\n  spam: 'Spam'\n};\n\n// Traite TOUS les mails d'un lot (plusieurs mails peuvent arriver en même temps)\nreturn $input.all().map((entry, i) => {\n  const item = entry.json;\n  const targetFolder = folderMap[item.categorie] || 'Tri-Administratif';\n  // Marqué comme lu uniquement si aucune action de votre part n'est nécessaire : réponse automatisée, ou spam.\n  const markAsRead = item.auto_envoi_possible === true || item.categorie === 'spam';\n  return { json: { ...item, targetFolder, markAsRead }, pairedItem: { item: i } };\n});"
+        "jsCode": "const folderMap = {\n  offre_fournisseur: 'Tri-Offre fournisseur',\n  confirmation_commande: 'Tri-Confirmation de commande',\n  prospects: 'Tri-Prospects',\n  suivi_client: 'Tri-SuiviClient',\n  administratif: 'Tri-Administratif',\n  litige: 'Tri-Litige',\n  facturation: 'Tri-Facturation',\n  spam: 'Spam'\n};\n\n// Traite TOUS les mails d'un lot (plusieurs mails peuvent arriver en même temps)\nreturn $input.all().map((entry, i) => {\n  const item = entry.json;\n  const targetFolder = folderMap[item.categorie] || 'Tri-Administratif';\n  // Pas de réponse automatique sur cette boîte : seul le spam est marqué lu.\n  const markAsRead = item.categorie === 'spam';\n  return { json: { ...item, targetFolder, markAsRead }, pairedItem: { item: i } };\n});"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -383,7 +304,7 @@
     },
     {
       "parameters": {
-        "authentication": "imapThisNode",
+        "authentication": "coreImapAccount",
         "resource": "email",
         "operation": "moveEmail",
         "sourceMailbox": {
@@ -407,9 +328,9 @@
       "id": "f1a1b111-0000-4000-8000-000000000021",
       "name": "Déplacer le mail",
       "credentials": {
-        "imapApi": {
-          "id": "7D7EF7hYzLreslfS",
-          "name": "IMAP Move - v.caufriez@ebanista.fr"
+        "imap": {
+          "id": "nFnyy1qJ60BZTKsw",
+          "name": "IMAP - contact@ebanista.fr"
         }
       }
     },
@@ -449,7 +370,7 @@
     },
     {
       "parameters": {
-        "authentication": "imapThisNode",
+        "authentication": "coreImapAccount",
         "resource": "email",
         "operation": "setEmailFlags",
         "mailboxPath": {
@@ -471,9 +392,9 @@
       "id": "f1a1b111-0000-4000-8000-000000000023",
       "name": "Marquer comme lu",
       "credentials": {
-        "imapApi": {
-          "id": "7D7EF7hYzLreslfS",
-          "name": "IMAP Move - v.caufriez@ebanista.fr"
+        "imap": {
+          "id": "nFnyy1qJ60BZTKsw",
+          "name": "IMAP - contact@ebanista.fr"
         }
       }
     },
@@ -535,7 +456,7 @@
     },
     {
       "parameters": {
-        "authentication": "imapThisNode",
+        "authentication": "coreImapAccount",
         "resource": "email",
         "operation": "downloadAttachment",
         "mailboxPath": {
@@ -556,9 +477,9 @@
       "id": "f1a1b111-0000-4000-8000-000000000031",
       "name": "Télécharger pièces jointes",
       "credentials": {
-        "imapApi": {
-          "id": "7D7EF7hYzLreslfS",
-          "name": "IMAP Move - v.caufriez@ebanista.fr"
+        "imap": {
+          "id": "nFnyy1qJ60BZTKsw",
+          "name": "IMAP - contact@ebanista.fr"
         }
       }
     },
@@ -568,7 +489,7 @@
         "toEmail": "comptabilite@ebanista.fr",
         "subject": "=TR: {{ $('Email Trigger (IMAP)').item.json.subject }}",
         "emailFormat": "text",
-        "text": "=Facture reçue sur v.caufriez@ebanista.fr et transmise automatiquement.\n\nDe : {{ $('Email Trigger (IMAP)').item.json.from.text }}\nDate : {{ $('Email Trigger (IMAP)').item.json.date }}\nObjet : {{ $('Email Trigger (IMAP)').item.json.subject }}\n\nRésumé : {{ $('Filtrer spam').item.json.resume }}\n\n---------- Message d'origine ----------\n{{ $('Email Trigger (IMAP)').item.json.text || '(message sans texte, voir pièces jointes)' }}",
+        "text": "=Facture reçue sur contact@ebanista.fr et transmise automatiquement.\n\nDe : {{ $('Email Trigger (IMAP)').item.json.from.text }}\nDate : {{ $('Email Trigger (IMAP)').item.json.date }}\nObjet : {{ $('Email Trigger (IMAP)').item.json.subject }}\n\nRésumé : {{ $('Filtrer spam').item.json.resume }}\n\n---------- Message d'origine ----------\n{{ $('Email Trigger (IMAP)').item.json.text || '(message sans texte, voir pièces jointes)' }}",
         "options": {
           "appendAttribution": false,
           "replyTo": "={{ $('Email Trigger (IMAP)').item.json.from.text }}",
@@ -602,7 +523,7 @@
           },
           "conditions": [
             {
-              "id": "d1000000-0000-4000-8000-00000000f001",
+              "id": "d2000000-0000-4000-8000-00000000f001",
               "leftValue": "={{ $json.reponse_requise }}",
               "rightValue": "",
               "operator": {
@@ -612,7 +533,7 @@
               }
             },
             {
-              "id": "d1000000-0000-4000-8000-00000000f002",
+              "id": "d2000000-0000-4000-8000-00000000f002",
               "leftValue": "={{ $('Email Trigger (IMAP)').item.json.from.text }}",
               "rightValue": "/(no[-_. ]?reply|ne[-_. ]?pas[-_. ]?r[eé]pondre|do[-_. ]?not[-_. ]?reply|mailer-daemon|postmaster|bounces?@)/i",
               "operator": {
@@ -621,7 +542,7 @@
               }
             },
             {
-              "id": "d1000000-0000-4000-8000-00000000f003",
+              "id": "d2000000-0000-4000-8000-00000000f003",
               "leftValue": "={{ ($('Email Trigger (IMAP)').item.json.from.value || [{}])[0].address || '' }}",
               "rightValue": "",
               "operator": {
@@ -641,7 +562,7 @@
         1568,
         -480
       ],
-      "id": "d1000000-0000-4000-8000-000000000041",
+      "id": "d2000000-0000-4000-8000-000000000041",
       "name": "Réponse à préparer ?"
     },
     {
@@ -654,7 +575,7 @@
         1792,
         -544
       ],
-      "id": "d1000000-0000-4000-8000-000000000042",
+      "id": "d2000000-0000-4000-8000-000000000042",
       "name": "Préparer données brouillon"
     },
     {
@@ -662,7 +583,7 @@
         "source": "database",
         "workflowId": {
           "__rl": true,
-          "value": "BqxroOO9AP3RhIjx",
+          "value": "dAXiYGhwrnLjIbHU",
           "mode": "id"
         },
         "mode": "each",
@@ -676,7 +597,7 @@
         2016,
         -544
       ],
-      "id": "d1000000-0000-4000-8000-000000000043",
+      "id": "d2000000-0000-4000-8000-000000000043",
       "name": "Rédiger un brouillon de réponse",
       "onError": "continueRegularOutput"
     },
@@ -690,7 +611,7 @@
         "columns": {
           "mappingMode": "defineBelow",
           "value": {
-            "boite": "v.caufriez",
+            "boite": "contact",
             "recu_le": "={{ $('Email Trigger (IMAP)').item.json.date }}",
             "from_address": "={{ (($('Email Trigger (IMAP)').item.json.from.value || [{}])[0].address || '').toLowerCase() }}",
             "from_name": "={{ ($('Email Trigger (IMAP)').item.json.from.value || [{}])[0].name || '' }}",
@@ -815,7 +736,7 @@
         1568,
         400
       ],
-      "id": "91128339-bf9e-47eb-ab77-c91ca00c1618",
+      "id": "dcb1a19d-87bf-40e7-9f74-c11cb01eeb64",
       "name": "Archiver pour les réponses"
     }
   ],
@@ -825,11 +746,6 @@
         [
           {
             "node": "Basic LLM Chain",
-            "type": "ai_languageModel",
-            "index": 0
-          },
-          {
-            "node": "Rédiger accusé personnalisé",
             "type": "ai_languageModel",
             "index": 0
           }
@@ -900,11 +816,6 @@
             "index": 0
           },
           {
-            "node": "Auto-envoi possible ?",
-            "type": "main",
-            "index": 0
-          },
-          {
             "node": "Facture à transférer ?",
             "type": "main",
             "index": 0
@@ -916,29 +827,6 @@
           },
           {
             "node": "Archiver pour les réponses",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Auto-envoi possible ?": {
-      "main": [
-        [
-          {
-            "node": "Rédiger accusé personnalisé",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        []
-      ]
-    },
-    "Rédiger accusé personnalisé": {
-      "main": [
-        [
-          {
-            "node": "Envoyer accusé de réception",
             "type": "main",
             "index": 0
           }
@@ -1045,7 +933,6 @@
   },
   "settings": {
     "executionOrder": "v1",
-    "binaryMode": "separate",
     "availableInMCP": false
   },
   "active": true

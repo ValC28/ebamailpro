@@ -1,0 +1,651 @@
+{
+  "name": "Tri mails - comptabilite",
+  "nodes": [
+    {
+      "parameters": {
+        "format": "resolved",
+        "options": {
+          "customEmailConfig": "[\"UNSEEN\", [\"SINCE\", \"Oct 9, 2026\"]]"
+        },
+        "postProcessAction": "nothing"
+      },
+      "type": "n8n-nodes-base.emailReadImap",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "4acf197b-93b5-4ffa-894d-e8cf9068550e",
+      "name": "Email Trigger (IMAP)",
+      "credentials": {
+        "imap": {
+          "id": "TkTrXXrbgNbUWRld",
+          "name": "IMAP - comptabilite@ebanista.fr"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Voici un email à analyser :\nExpéditeur : {{ $json.from.text }}\nSujet : {{ $json.subject }}\nContenu : {{ $json.text }}\n",
+        "messages": {
+          "messageValues": [
+            {
+              "message": "Tu es un assistant qui trie les emails professionnels d'une entreprise de menuiserie/ébénisterie (EBANISTA). Pour chaque email, réponds UNIQUEMENT en JSON avec cette structure exacte :\n{\n  \"categorie\": \"offre_fournisseur\" | \"confirmation_commande\" | \"prospects\" | \"suivi_client\" | \"administratif\" | \"litige\" | \"facturation\" | \"spam\",\n  \"urgent\": true ou false,\n  \"resume\": \"résumé en 2-3 lignes maximum\",\n  \"auto_envoi_possible\": true ou false,\n  \"reponse_requise\": true ou false\n}\n\nCatégories (avec exemples) :\n- offre_fournisseur : devis, propositions commerciales ou catalogues reçus d'un fournisseur. Ex : \"Devis panneaux MDF - validité 30 jours\"\n- confirmation_commande : accusés de réception ou confirmations d'une commande déjà passée à un fournisseur. Ex : \"Confirmation de votre commande n°4521\"\n- prospects : demandes d'information ou de devis de particuliers/entreprises intéressés par nos services. Ex : \"Devis pour cuisine sur mesure\"\n- suivi_client : échanges avec des clients déjà engagés sur un projet en cours. Ex : \"Où en est mon meuble ?\"\n- administratif : courriers officiels, banque, assurance, impôts, RH. Ex : \"Relevé bancaire disponible\"\n- litige : réclamation, mise en demeure, mention d'avocat/tribunal, forte insatisfaction client. TOUJOURS urgent=true et auto_envoi_possible=false.\n- facturation : factures reçues ou envoyées, relances de paiement. Ex : \"Facture n°2026-045\"\n- spam : newsletters, publicités, phishing évident, démarchage commercial non sollicité sans rapport avec l'activité.\n\nRègles d'urgence :\n- Ne pas se fier au mot \"urgent\" dans le sujet s'il n'est pas justifié par le contenu réel (une simple question commerciale n'est pas urgente même si le sujet dit \"urgent\").\n- Est urgent : litige (toujours), délai serré explicite (\"réponse avant demain\"), problème bloquant sur un chantier en cours, client insatisfait qui réclame.\n\nRègles auto_envoi_possible :\n- true UNIQUEMENT pour : accusé de réception simple sans action requise, confirmation de rdv déjà validée, confirmation_commande (accusé fournisseur).\n- false pour tout le reste, en particulier : offre_fournisseur, devis, facture, litige, toute demande nécessitant une réponse personnalisée ou une décision métier.\n\nRègles reponse_requise :\n- true si l'expéditeur attend une vraie réponse rédigée de l'entreprise : question, demande de devis ou de prix, demande de rendez-vous ou de disponibilité, relance, réclamation, proposition à accepter ou refuser.\n- false pour : spam, notifications et mails automatiques (y compris les réponses automatiques d'absence), accusés de réception et confirmations sans question, factures et relevés sans question, newsletters, mails reçus seulement en copie pour information.\n\nLe résumé doit être factuel et concis, sans reformuler tout l'email."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        608,
+        0
+      ],
+      "id": "0c6fe25a-11e3-4c7e-b5ae-efd8a3629137",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "claude-sonnet-4-6",
+          "cachedResultName": "Claude Sonnet 4.6"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        992,
+        0
+      ],
+      "id": "9d47d40d-f929-4681-ab5c-711d775c9e1d",
+      "name": "Anthropic Chat Model",
+      "credentials": {
+        "anthropicApi": {
+          "id": "FRxZizEr7zCaHHZp",
+          "name": "Claude API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const results = [];\n\nfor (const item of $input.all()) {\n  const rawText = item.json.text;\n  const match = rawText.match(/\\{[\\s\\S]*\\}/);\n  const parsed = JSON.parse(match[0]);\n  \n  results.push({\n    json: {\n      categorie: parsed.categorie,\n      urgent: parsed.urgent,\n      resume: parsed.resume,\n      auto_envoi_possible: parsed.auto_envoi_possible,\n      reponse_requise: parsed.reponse_requise === true\n    }\n  });\n}\n\nreturn results;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        144
+      ],
+      "id": "10349273-435b-4320-b5fb-fbebf52de6a6",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f22f7138-265f-46e1-8325-3ff0776b55a7",
+              "leftValue": "={{ $json.urgent }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1344,
+        144
+      ],
+      "id": "0b6b1958-7db2-468c-bf33-935de9103024",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "chatId": "8848139246",
+        "text": "={{ (\"🚨 Mail urgent reçu sur comptabilite@ebanista.fr\\n\\nDe : \" + ($('Email Trigger (IMAP)').item.json.from.text) + \"\\nCatégorie : \" + ($json.categorie) + \"\\n\\n\" + ($json.resume) + \"\\n\").replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1568,
+        48
+      ],
+      "id": "a00d2675-2c89-4e0f-b077-76de969ad947",
+      "name": "Send a text message",
+      "credentials": {
+        "telegramApi": {
+          "id": "duvmoy6UkxnbnBdr",
+          "name": "Ebanista Mails"
+        }
+      },
+      "webhookId": "590ae063-52c5-484e-a289-00f479478d5c"
+    },
+    {
+      "parameters": {
+        "dataTableId": {
+          "__rl": true,
+          "value": "IgT0r6Yg3ZtzMWNR",
+          "mode": "list",
+          "cachedResultName": "digest_mails",
+          "cachedResultUrl": "/projects/WBZOJkoq8ImSC8dI/datatables/IgT0r6Yg3ZtzMWNR"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "auto_envoye": "={{ false }}",
+            "expediteur": "={{ $('Email Trigger (IMAP)').item.json.from.text }}",
+            "categorie": "={{ $json.categorie }}",
+            "resume": "={{ $json.resume }}",
+            "date": "={{ $now.format('yyyy-MM-dd HH:mm') }}",
+            "boite": "comptabilite"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "date",
+              "displayName": "date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "expediteur",
+              "displayName": "expediteur",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "categorie",
+              "displayName": "categorie",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "resume",
+              "displayName": "resume",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "auto_envoye",
+              "displayName": "auto_envoye",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "boolean",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "boite",
+              "displayName": "boite",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.dataTable",
+      "typeVersion": 1.1,
+      "position": [
+        1568,
+        240
+      ],
+      "id": "122b45a3-88b0-46be-be02-8b79a661cf3f",
+      "name": "Insert row"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f1a1b111-0000-4000-8000-00000000f001",
+              "leftValue": "={{ $json.categorie }}",
+              "rightValue": "spam",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        1344,
+        0
+      ],
+      "id": "f1a1b111-0000-4000-8000-000000000010",
+      "name": "Filtrer spam"
+    },
+    {
+      "parameters": {
+        "jsCode": "const folderMap = {\n  offre_fournisseur: 'Tri-Offre fournisseur',\n  confirmation_commande: 'Tri-Confirmation de commande',\n  prospects: 'Tri-Prospects',\n  suivi_client: 'Tri-SuiviClient',\n  administratif: 'Tri-Administratif',\n  litige: 'Tri-Litige',\n  facturation: 'Tri-Facturation',\n  spam: 'Spam'\n};\n\n// Traite TOUS les mails d'un lot (plusieurs mails peuvent arriver en même temps)\nreturn $input.all().map((entry, i) => {\n  const item = entry.json;\n  const targetFolder = folderMap[item.categorie] || 'Tri-Administratif';\n  // Pas de réponse automatique sur cette boîte : seul le spam est marqué lu.\n  const markAsRead = item.categorie === 'spam';\n  return { json: { ...item, targetFolder, markAsRead }, pairedItem: { item: i } };\n});"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1344,
+        288
+      ],
+      "id": "f1a1b111-0000-4000-8000-000000000020",
+      "name": "Déterminer dossier cible"
+    },
+    {
+      "parameters": {
+        "authentication": "coreImapAccount",
+        "resource": "email",
+        "operation": "moveEmail",
+        "sourceMailbox": {
+          "__rl": true,
+          "mode": "path",
+          "value": "INBOX"
+        },
+        "emailUid": "={{ $('Email Trigger (IMAP)').item.json.attributes.uid }}",
+        "destinationMailbox": {
+          "__rl": true,
+          "mode": "path",
+          "value": "={{ $('Déterminer dossier cible').item.json.targetFolder }}"
+        }
+      },
+      "type": "n8n-nodes-imap.imap",
+      "typeVersion": 1,
+      "position": [
+        1568,
+        288
+      ],
+      "id": "f1a1b111-0000-4000-8000-000000000021",
+      "name": "Déplacer le mail",
+      "credentials": {
+        "imap": {
+          "id": "TkTrXXrbgNbUWRld",
+          "name": "IMAP - comptabilite@ebanista.fr"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "f1a1b111-0000-4000-8000-00000000f003",
+              "leftValue": "={{ $json.markAsRead }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1568,
+        200
+      ],
+      "id": "f1a1b111-0000-4000-8000-000000000022",
+      "name": "Faut-il marquer lu ?"
+    },
+    {
+      "parameters": {
+        "authentication": "coreImapAccount",
+        "resource": "email",
+        "operation": "setEmailFlags",
+        "mailboxPath": {
+          "__rl": true,
+          "mode": "path",
+          "value": "INBOX"
+        },
+        "emailUid": "={{ $('Email Trigger (IMAP)').item.json.attributes.uid }}",
+        "flags": {
+          "\\Seen": true
+        }
+      },
+      "type": "n8n-nodes-imap.imap",
+      "typeVersion": 1,
+      "position": [
+        1792,
+        144
+      ],
+      "id": "f1a1b111-0000-4000-8000-000000000023",
+      "name": "Marquer comme lu",
+      "credentials": {
+        "imap": {
+          "id": "TkTrXXrbgNbUWRld",
+          "name": "IMAP - comptabilite@ebanista.fr"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": 1
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1792,
+        144
+      ],
+      "id": "f1a1b111-0000-4000-8000-000000000024",
+      "name": "Attendre 8s",
+      "webhookId": "a0113614-411e-4451-8f6e-24805da6f086"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "d2000000-0000-4000-8000-00000000f001",
+              "leftValue": "={{ $json.reponse_requise }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "d2000000-0000-4000-8000-00000000f002",
+              "leftValue": "={{ $('Email Trigger (IMAP)').item.json.from.text }}",
+              "rightValue": "/(no[-_. ]?reply|ne[-_. ]?pas[-_. ]?r[eé]pondre|do[-_. ]?not[-_. ]?reply|mailer-daemon|postmaster|bounces?@)/i",
+              "operator": {
+                "type": "string",
+                "operation": "notRegex"
+              }
+            },
+            {
+              "id": "d2000000-0000-4000-8000-00000000f003",
+              "leftValue": "={{ ($('Email Trigger (IMAP)').item.json.from.value || [{}])[0].address || '' }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1568,
+        -480
+      ],
+      "id": "d2000000-0000-4000-8000-000000000041",
+      "name": "Réponse à préparer ?"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prépare, pour chaque mail à traiter, les données envoyées au sous-workflow de rédaction\nreturn $input.all().map((entry, i) => {\n  const mail = $('Email Trigger (IMAP)').itemMatching(i).json;\n  const from = (mail.from && mail.from.value && mail.from.value[0]) || {};\n  return {\n    json: {\n      from_address: from.address || '',\n      from_name: from.name || '',\n      subject: mail.subject || '',\n      text: mail.text || '',\n      date: mail.date || '',\n      message_id: mail.messageId || '',\n      resume: entry.json.resume || '',\n      categorie: entry.json.categorie || '',\n    },\n    pairedItem: { item: i },\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1792,
+        -544
+      ],
+      "id": "d2000000-0000-4000-8000-000000000042",
+      "name": "Préparer données brouillon"
+    },
+    {
+      "parameters": {
+        "source": "database",
+        "workflowId": {
+          "__rl": true,
+          "value": "705Af47ZTs7QhMZd",
+          "mode": "id"
+        },
+        "mode": "each",
+        "options": {
+          "waitForSubWorkflow": false
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.1,
+      "position": [
+        2016,
+        -544
+      ],
+      "id": "d2000000-0000-4000-8000-000000000043",
+      "name": "Rédiger un brouillon de réponse",
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Trigger (IMAP)": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Filtrer spam",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Déterminer dossier cible",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Filtrer spam": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Insert row",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Réponse à préparer ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Déterminer dossier cible": {
+      "main": [
+        [
+          {
+            "node": "Faut-il marquer lu ?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Faut-il marquer lu ?": {
+      "main": [
+        [
+          {
+            "node": "Marquer comme lu",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Déplacer le mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marquer comme lu": {
+      "main": [
+        [
+          {
+            "node": "Attendre 8s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Attendre 8s": {
+      "main": [
+        [
+          {
+            "node": "Déplacer le mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Réponse à préparer ?": {
+      "main": [
+        [
+          {
+            "node": "Préparer données brouillon",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Préparer données brouillon": {
+      "main": [
+        [
+          {
+            "node": "Rédiger un brouillon de réponse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "active": true
+}

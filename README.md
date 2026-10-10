@@ -24,3 +24,26 @@ Sauvegarde automatique quotidienne (cron, tous les jours à 3h du matin, heure d
 7. Vérifier dans l'UI n8n que les credentials et workflows sont bien présents et actifs.
 
 Les fichiers `workflows/*.json` servent de sauvegarde secondaire lisible (re-import possible via l'UI n8n si le dump Postgres est indisponible), mais ne contiennent pas les credentials.
+
+## Relais Telegram (assistant e-mails)
+
+Le dossier `telegram-bridge/` contient `bridge.py` : un petit service qui récupère les messages du bot Telegram (long polling) et les transmet au workflow n8n « Assistant e-mails Telegram » par le réseau interne Docker. Rien n'est exposé sur Internet, et seul le compte Telegram autorisé est relayé.
+
+**Les secrets ne sont PAS dans ce dépôt.** À recréer à la main sur le serveur :
+
+1. `mkdir -p /root/telegram-bridge/data && chmod 700 /root/telegram-bridge` puis copier `bridge.py` dedans.
+2. `/root/telegram-bridge/.env` (droits 600) :
+   ```
+   TELEGRAM_BOT_TOKEN=<jeton du bot, à redemander à @BotFather (/mybots)>
+   ALLOWED_CHAT_ID=8848139246
+   ```
+3. `/root/telegram-bridge/secret.env` (droits 600) : `BRIDGE_SECRET=<même valeur que le credential n8n « Pont Telegram (secret) »>` (si besoin, recréer les deux avec une nouvelle valeur).
+4. Lancer le conteneur (le chemin du webhook se lit dans le nœud « Webhook Telegram » du workflow) :
+   ```
+   docker run -d --name telegram-bridge --restart unless-stopped --network root_default \
+     --env-file /root/telegram-bridge/.env --env-file /root/telegram-bridge/secret.env \
+     -e N8N_WEBHOOK_URL="http://n8n:5678/webhook/<chemin-du-webhook>" -e OFFSET_FILE=/app/data/offset \
+     -v /root/telegram-bridge/bridge.py:/app/bridge.py:ro -v /root/telegram-bridge/data:/app/data \
+     python:3.12-alpine python -u /app/bridge.py
+   ```
+5. Vérifier : `docker logs telegram-bridge` doit afficher « relais démarré ».

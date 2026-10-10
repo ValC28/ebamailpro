@@ -55,7 +55,7 @@
     },
     {
       "parameters": {
-        "jsCode": "const rows = $input.first().json.data || [];\n\nlet text;\nif (rows.length === 0) {\n  text = \"\\ud83d\\udccb Digest quotidien EBANISTA\\n\\nAucun mail \\u00e0 traiter aujourd'hui.\";\n} else {\n  const lines = rows.map(r => `\\u2022 [${r.categorie}] ${r.expediteur}\\n  ${r.resume}`);\n  text = `\\ud83d\\udccb Digest quotidien EBANISTA \\u2014 ${rows.length} mail(s)\\n\\n` + lines.join(\"\\n\\n\");\n}\n\nreturn [{ json: { text, count: rows.length } }];"
+        "jsCode": "const rows = $input.first().json.data || [];\n\nconst LIMIT = 3800; // limite Telegram : 4096 caractères par message\nconst LABELS = { 'v.caufriez': 'v.caufriez@ebanista.fr', 'contact': 'contact@ebanista.fr', 'comptabilite': 'comptabilite@ebanista.fr' };\nconst ORDER = ['v.caufriez', 'contact', 'comptabilite'];\n\nif (rows.length === 0) {\n  return [{ json: { text: \"📋 Digest quotidien EBANISTA\\n\\nAucun mail à traiter aujourd'hui.\", count: 0 } }];\n}\n\n// regroupement par boîte (les anciennes lignes sans boîte viennent de v.caufriez)\nconst groups = {};\nfor (const r of rows) {\n  const box = r.boite || 'v.caufriez';\n  (groups[box] = groups[box] || []).push(r);\n}\nconst boxes = [...ORDER.filter(b => groups[b]), ...Object.keys(groups).filter(b => !ORDER.includes(b))];\n\n// un bloc de texte par boîte, puis découpage en messages de taille raisonnable\nconst blocks = [];\nfor (const box of boxes) {\n  const list = groups[box];\n  blocks.push(`📥 ${LABELS[box] || box} (${list.length})`);\n  for (const r of list) {\n    blocks.push(`• [${r.categorie}] ${r.expediteur}\\n  ${r.resume}`);\n  }\n}\n\nconst header = `📋 Digest quotidien EBANISTA — ${rows.length} mail(s)`;\nconst chunks = [];\nlet current = header;\nfor (const b of blocks) {\n  const next = current + '\\n\\n' + b;\n  if (next.length > LIMIT && current !== header) {\n    chunks.push(current);\n    current = '(suite)\\n\\n' + b;\n  } else {\n    current = next;\n  }\n}\nchunks.push(current);\n\nreturn chunks.map(text => ({ json: { text, count: rows.length } }));\n"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -69,8 +69,11 @@
     {
       "parameters": {
         "chatId": "8848139246",
-        "text": "={{ $json.text }}",
-        "additionalFields": {}
+        "text": "={{ (($json.text)).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
       },
       "type": "n8n-nodes-base.telegram",
       "typeVersion": 1.2,
